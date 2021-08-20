@@ -7,10 +7,14 @@
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "target": "es6",
+    "strict": true,
+    "target": "ES2020",
     "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true
+    "rootDir": "src",
+    "importsNotUsedAsValues": "error",
+    "noUnusedLocals": true,
+    "noUnusedParameters": false
   },
-  "exclude": ["node_modules", "dist", "lib"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "src/node_modules"]
 }
