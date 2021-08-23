@@ -18,6 +18,10 @@ export class Plugin {
         title: 'Build Vue app',
         async task() {
           await System.spawn('npm', ['run', 'build:vue']);
+          await fse.move(
+            path.join(process.cwd(), 'dist', 'ui', 'index.html'),
+            path.join(process.cwd(), 'dist', 'ui', '_index.html'),
+          );
         },
       },
       {
@@ -91,24 +95,26 @@ export class Plugin {
       {
         title: 'Inject backend paths and plugin name',
         async task() {
-          const goBackBase = '../..';
+          // const goBackBase = '../../..';
           const filePaths = await System.fileTree(
             path.join(process.cwd(), 'dist', 'backend'),
             '',
           );
           for (let i = 0; i < filePaths.length; i++) {
             const filePath = filePaths[i];
-            const fileDepth = filePath.rel.split('/');
-            const base = [goBackBase, ...Array(fileDepth).map(() => '..')].join(
-              '/',
-            );
+            // const fileDepth =
+            //   filePath.rel === '' ? [] : filePath.rel.split('/');
+            // const base = [goBackBase, ...fileDepth.map(() => '..'), 'src'].join(
+            //   '/',
+            // );
             let file = await System.readFile(filePath.abs);
             let buffer = '' + file;
             let loop = true;
             while (loop) {
               file = file
-                .replace('@becomes/cms-backend', base)
-                .replace('@bcms', base);
+                // .replace('@becomes/cms-backend', base)
+                // .replace('@bcms', base)
+                .replace('bcms-plugin---name', pluginName);
               if (file === buffer) {
                 loop = false;
               } else {
