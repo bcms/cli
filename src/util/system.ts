@@ -1,7 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
-import { SpawnOptions, spawn } from 'child_process';
+import { SpawnOptions, spawn, exec, ExecOptions } from 'child_process';
+
+export interface SystemExecOutput {
+  stop(): void;
+  awaiter: Promise<void>;
+}
 
 export class System {
   static async spawn(
@@ -27,6 +32,50 @@ export class System {
         }
       });
     });
+  }
+  static exec(
+    cmd: string,
+    options?: ExecOptions & {
+      onChunk?: (type: 'stdout' | 'stderr', chunk: string) => void;
+      doNotThrowError?: boolean;
+    },
+  ): SystemExecOutput {
+    const output: SystemExecOutput = {
+      stop: undefined as never,
+      awaiter: undefined as never,
+    };
+    output.awaiter = new Promise<void>((resolve, reject) => {
+      const proc = exec(cmd, options);
+      output.stop = () => {
+        proc.kill();
+      };
+      if (options && options.onChunk) {
+        const onChunk = options.onChunk;
+        if (proc.stderr) {
+          proc.stderr.on('data', (chunk) => {
+            onChunk('stderr', chunk);
+          });
+        }
+        if (proc.stdout) {
+          proc.stdout.on('data', (chunk) => {
+            onChunk('stdout', chunk);
+          });
+        }
+      }
+      proc.on('close', (code) => {
+        if (options && options.doNotThrowError) {
+          resolve();
+        } else if (code !== 0) {
+          reject(code);
+        } else {
+          resolve();
+        }
+      });
+    });
+    return output;
+  }
+  static async readdir(location: string): Promise<string[]> {
+    return await util.promisify(fs.readdir)(location);
   }
   static async readFile(location: string): Promise<string> {
     return (await util.promisify(fs.readFile)(location)).toString();

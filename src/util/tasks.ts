@@ -28,7 +28,7 @@ export function createTasks(tasks: Task[]): {
       for (let i = 0; i < tasks.length; i = i + 1) {
         const timeOffs = Date.now();
         const task = tasks[i];
-        console.log(`${i + 1}. ${task.title}`);
+        console.log(`\n${i + 1}. ${task.title}\n`);
         try {
           await task.task();
           taskTimes.push({
@@ -36,7 +36,7 @@ export function createTasks(tasks: Task[]): {
             time: Date.now() - timeOffs,
             prettyTime: toReadableTime(Date.now() - timeOffs),
           });
-          console.log(`✓ ${i + 1}. ${task.title}`);
+          console.log(`\n✓ ${i + 1}. ${task.title}\n`);
         } catch (error) {
           taskTimes.push({
             offs: timeOffs,
@@ -49,14 +49,16 @@ export function createTasks(tasks: Task[]): {
               break;
             } else {
               console.log(
-                `✓ ${j + 1}. ${t.title} completed in ${
+                `\n✓ ${j + 1}. ${t.title} completed in ${
                   taskTimes[j].prettyTime
-                }`,
+                }\n`,
               );
             }
           }
           console.log(
-            `⨉ ${i + 1}. ${task.title} failed in ${taskTimes[i].prettyTime}`,
+            `\n⨉ ${i + 1}. ${task.title} failed in ${
+              taskTimes[i].prettyTime
+            }\n`,
           );
           throw error;
         }

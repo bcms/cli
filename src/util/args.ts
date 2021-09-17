@@ -4,6 +4,8 @@ export interface Args {
   create?: boolean;
   function?: string;
   public?: boolean;
+  instance?: string;
+  run?: boolean;
 }
 
 export function parseArgs(rawArgs: string[]): Args {
@@ -40,5 +42,7 @@ export function parseArgs(rawArgs: string[]): Args {
     create: getArg('--create', 'boolean'),
     function: getArg('--function', 'string'),
     public: getArg('--public', 'boolean'),
+    instance: getArg('--instance', 'string'),
+    run: getArg('--run', 'boolean'),
   };
 }
