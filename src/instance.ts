@@ -175,14 +175,14 @@ export class Instance {
         throw Error(rexo.err);
       }
     }
-    let licenseFileName = '';
+    let licenseFileName= '';
     const mainTasks = createTasks([
       {
         title: 'Verify BCMS license',
         async task() {
           const files = await System.readdir(process.cwd());
-          licenseFileName = files.find((e) => e.endsWith('.license'));
-          if (!licenseFileName) {
+          const licenseName = files.find((e) => e.endsWith('.license'));
+          if (!licenseName) {
             console.log('Files in current directory:\n\t', files.join('\n\t'));
             throw Error(
               [
@@ -193,6 +193,7 @@ export class Instance {
               ].join(' '),
             );
           }
+          licenseFileName = licenseName;
           const license = await System.readFile(
             path.join(process.cwd(), licenseFileName),
           );
@@ -324,7 +325,7 @@ export class Instance {
         },
       },
       {
-        title: 'Tail the output for 10s',
+        title: 'Tail the output for 5s',
         async task() {
           const proc = System.exec('docker logs --tail 500 -f bcms-shim', {
             onChunk(type, chunk) {
@@ -334,7 +335,7 @@ export class Instance {
           });
           setTimeout(() => {
             proc.stop();
-          }, 10000);
+          }, 5000);
           await proc.awaiter;
         },
       },
