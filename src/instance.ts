@@ -175,7 +175,7 @@ export class Instance {
         throw Error(rexo.err);
       }
     }
-    let licenseFileName= '';
+    let licenseFileName = '';
     const mainTasks = createTasks([
       {
         title: 'Verify BCMS license',
@@ -295,13 +295,21 @@ export class Instance {
         },
       },
       {
+        title: 'Pull Docker BCMS Shim image',
+        async task() {
+          await System.spawn('docker', ['pull', 'becomes/cms-shim']);
+        },
+      },
+      {
         title: 'Run BCMS Shim container',
         async task() {
           await System.exec(
             [
               'cd /home/bcms',
               '&&',
-              'sudo su bcms',
+              'su bcms -y',
+              '&&',
+              'ls -l',
               '&&',
               'docker',
               'run',
@@ -320,7 +328,19 @@ export class Instance {
               'BCMS_CLOUD_DOMAIN=cloud.thebcms.com',
               '-e',
               'BCMS_CLOUD_PORT=443',
+              '-e',
+              'BCMS_MANAGE=true',
+              '--name',
+              'bcms-shim',
+              'becomes/cms-shim',
+              '&&',
+              'ls -l',
             ].join(' '),
+            {
+              onChunk(type, chunk) {
+                process[type].write(chunk);
+              },
+            },
           ).awaiter;
         },
       },
