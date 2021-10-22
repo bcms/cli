@@ -95,26 +95,17 @@ export class Plugin {
       {
         title: 'Inject backend paths and plugin name',
         async task() {
-          // const goBackBase = '../../..';
           const filePaths = await System.fileTree(
             path.join(process.cwd(), 'dist', 'backend'),
             '',
           );
           for (let i = 0; i < filePaths.length; i++) {
             const filePath = filePaths[i];
-            // const fileDepth =
-            //   filePath.rel === '' ? [] : filePath.rel.split('/');
-            // const base = [goBackBase, ...fileDepth.map(() => '..'), 'src'].join(
-            //   '/',
-            // );
             let file = await System.readFile(filePath.abs);
             let buffer = '' + file;
             let loop = true;
             while (loop) {
-              file = file
-                // .replace('@becomes/cms-backend', base)
-                // .replace('@bcms', base)
-                .replace('bcms-plugin---name', pluginName);
+              file = file.replace('bcms-plugin---name', pluginName);
               if (file === buffer) {
                 loop = false;
               } else {

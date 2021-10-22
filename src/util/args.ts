@@ -1,11 +1,12 @@
 export interface Args {
   bundle?: boolean;
-  plugin?: string;
+  plugin?: boolean;
   create?: boolean;
   function?: string;
   public?: boolean;
   instance?: string;
   run?: boolean;
+  cms?: boolean;
 }
 
 export function parseArgs(rawArgs: string[]): Args {
@@ -38,11 +39,12 @@ export function parseArgs(rawArgs: string[]): Args {
   }
   return {
     bundle: getArg('--bundle', 'boolean'),
-    plugin: getArg('--bundle', 'string'),
+    plugin: getArg('--bundle', 'boolean'),
     create: getArg('--create', 'boolean'),
     function: getArg('--function', 'string'),
     public: getArg('--public', 'boolean'),
     instance: getArg('--instance', 'string'),
     run: getArg('--run', 'boolean'),
+    cms: getArg('--cms', 'boolean'),
   };
 }

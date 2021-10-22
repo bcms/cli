@@ -19,20 +19,22 @@
     "lint": "eslint . --ext .ts"
   },
   "dependencies": {
+    "adm-zip": "^0.5.9",
     "fs-extra": "^8.1.0",
     "inquirer": "^8.1.2"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.4.34",
     "@types/fs-extra": "^9.0.12",
     "@types/inquirer": "^7.3.3",
     "@types/node": "^15.6.2",
-    "@typescript-eslint/eslint-plugin": "^4.24.0",
-    "@typescript-eslint/parser": "^4.24.0",
-    "eslint": "^7.24.0",
+    "@typescript-eslint/eslint-plugin": "^5.1.0",
+    "@typescript-eslint/parser": "^5.1.0",
+    "eslint": "^8.0.1",
     "nodemon": "^2.0.7",
     "prettier": "^2.2.1",
     "ts-node": "^9.1.1",
-    "typescript": "^4.3.5"
+    "typescript": "^4.4.4"
   },
   "repository": {
     "type": "git",
