@@ -12,6 +12,7 @@
 /dockerfile-local/dist
 /local-dev-dist
 /public
+/src/util/_bcms_security.json
 
 # Logs
 /log

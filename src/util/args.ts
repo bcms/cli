@@ -7,6 +7,7 @@ export interface Args {
   instance?: string;
   run?: boolean;
   cms?: boolean;
+  cloudOrigin?: string;
 }
 
 export function parseArgs(rawArgs: string[]): Args {
@@ -28,23 +29,27 @@ export function parseArgs(rawArgs: string[]): Args {
     }
   }
   function getArg<T extends string | boolean>(
-    name: string,
+    names: string[],
     type: 'string' | 'boolean',
   ): T | undefined {
-    if (type === 'string') {
-      return args[name] as T;
-    } else {
-      return (args[name] === '' || args[name] === 'true' || false) as T;
+    for (let j = 0; j < names.length; j++) {
+      const name = names[j];
+      if (type === 'string') {
+        return args[name] as T;
+      } else {
+        return (args[name] === '' || args[name] === 'true' || false) as T;
+      }
     }
   }
   return {
-    bundle: getArg('--bundle', 'boolean'),
-    plugin: getArg('--bundle', 'boolean'),
-    create: getArg('--create', 'boolean'),
-    function: getArg('--function', 'string'),
-    public: getArg('--public', 'boolean'),
-    instance: getArg('--instance', 'string'),
-    run: getArg('--run', 'boolean'),
-    cms: getArg('--cms', 'boolean'),
+    bundle: getArg(['--bundle', '-b'], 'boolean'),
+    plugin: getArg(['--plugin', '-pl'], 'boolean'),
+    create: getArg(['--create', '-c'], 'boolean'),
+    function: getArg(['--function', '-f'], 'string'),
+    public: getArg(['--public', '-p'], 'boolean'),
+    instance: getArg(['--instance', '-i'], 'string'),
+    run: getArg(['--run'], 'boolean'),
+    cms: getArg(['--cms'], 'boolean'),
+    cloudOrigin: getArg(['--cloud-origin', '-co'], 'boolean'),
   };
 }

@@ -51,29 +51,39 @@ export class CMS {
           const plugins = pluginString
             .split(',')
             .filter((e) => e)
-            .map((e) =>
-              e
+            .map((e) => {
+              const raw = e
                 .replace(/'/g, '')
                 .replace(/"/g, '')
                 .replace(/ /g, '')
-                .replace(/\n/g, '')
-                .replace(/@/g, '')
-                .replace(/\//g, '-'),
-            );
+                .replace(/\n/g, '');
+              return {
+                formatted: raw.replace(/@/g, '').replace(/\//g, '-'),
+                raw,
+              };
+            });
           if (plugins.length > 0) {
+            const pluginList: string[] = [];
             for (let i = 0; i < plugins.length; i++) {
-              const pluginName = plugins[i] + '.tgz';
+              const pluginName = plugins[i].formatted + '.tgz';
               if (
                 await System.exist(
                   path.join(process.cwd(), 'plugins', pluginName),
                   true,
                 )
               ) {
+                pluginList.push(plugins[i].raw);
                 await fse.copy(
                   path.join(process.cwd(), 'plugins', pluginName),
                   path.join(process.cwd(), 'dist', 'plugins', pluginName),
                 );
               }
+            }
+            if (pluginList.length > 0) {
+              await System.writeFile(
+                path.join(process.cwd(), 'dist', 'plugin-list.json'),
+                JSON.stringify(pluginList),
+              );
             }
           }
         },
