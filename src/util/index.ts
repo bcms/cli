@@ -1,7 +1,6 @@
 export * from './args';
 export * from './file-replacer';
 export * from './queue';
-export * from './security';
 export * from './string';
 export * from './system';
 export * from './tasks';

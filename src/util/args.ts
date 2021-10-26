@@ -8,6 +8,11 @@ export interface Args {
   run?: boolean;
   cms?: boolean;
   cloudOrigin?: string;
+  login?: boolean;
+  logout?: boolean;
+  email?: string;
+  password?: string;
+  deploy?: string;
 }
 
 export function parseArgs(rawArgs: string[]): Args {
@@ -34,22 +39,34 @@ export function parseArgs(rawArgs: string[]): Args {
   ): T | undefined {
     for (let j = 0; j < names.length; j++) {
       const name = names[j];
-      if (type === 'string') {
-        return args[name] as T;
-      } else {
-        return (args[name] === '' || args[name] === 'true' || false) as T;
+      if (args[name]) {
+        if (type === 'string') {
+          return args[name] as T;
+        } else {
+          return (args[name] === '' || args[name] === 'true' || false) as T;
+        }
       }
+    }
+    if (type === 'string') {
+      return args[names[0]] as T;
+    } else {
+      return (args[names[0]] === '' || args[names[0]] === 'true' || false) as T;
     }
   }
   return {
-    bundle: getArg(['--bundle', '-b'], 'boolean'),
-    plugin: getArg(['--plugin', '-pl'], 'boolean'),
-    create: getArg(['--create', '-c'], 'boolean'),
-    function: getArg(['--function', '-f'], 'string'),
-    public: getArg(['--public', '-p'], 'boolean'),
-    instance: getArg(['--instance', '-i'], 'string'),
+    login: getArg(['--login'], 'boolean'),
+    logout: getArg(['--logout'], 'boolean'),
+    bundle: getArg(['--bundle', '--b'], 'boolean'),
+    plugin: getArg(['--plugin', '--pl'], 'boolean'),
+    create: getArg(['--create', '--c'], 'boolean'),
+    function: getArg(['--function', '--f'], 'string'),
+    public: getArg(['--public', '--p'], 'boolean'),
+    instance: getArg(['--instance', '--i'], 'string'),
     run: getArg(['--run'], 'boolean'),
     cms: getArg(['--cms'], 'boolean'),
-    cloudOrigin: getArg(['--cloud-origin', '-co'], 'boolean'),
+    deploy: getArg(['--deploy', '--d'], 'string'),
+    cloudOrigin: getArg(['--cloud-origin', '--co'], 'string'),
+    email: getArg(['--email'], 'string'),
+    password: getArg(['--password'], 'string'),
   };
 }

@@ -1,12 +1,10 @@
-import type { ApiClient } from '@becomes/cms-cloud-client/types';
+import type { ApiClient, Storage } from '@becomes/cms-cloud-client/types';
 import {
   createApiClient,
   createCache,
-  createStorage,
   useApiClient,
 } from '@becomes/cms-cloud-client';
 import { Args, useThrowable } from './util';
-import type { Entity } from './types';
 
 interface DefaultSetters<Item> {
   set(srcItems: Item[], items: Item | Item[]): void;
@@ -105,12 +103,20 @@ function defaultGetters<Item>(): {
   };
 }
 
-export function createCloudApiClient(args: Args): ApiClient {
+export function createCloudApiClient({
+  args,
+  storage,
+}: {
+  args: Args;
+  storage: Storage;
+}): ApiClient {
   createApiClient({
+    disableSocket: true,
     apiOrigin: args.cloudOrigin
-      ? args.cloudOrigin
-      : 'https://cloud.thebcms.com',
+      ? args.cloudOrigin + '/api/v1/gql'
+      : 'https://cloud.thebcms.com/api/v1/gql',
     throwable: useThrowable(),
+    storage,
     router: {
       async push() {
         // Do nothing...
@@ -119,9 +125,9 @@ export function createCloudApiClient(args: Args): ApiClient {
     cache: createCache(() => {
       const cache: {
         [name: string]: {
-          items: Entity[];
-          setters: DefaultSetters<Entity>;
-          getters: DefaultGetters<Entity>;
+          items: any[];
+          setters: DefaultSetters<any>;
+          getters: DefaultGetters<any>;
         };
       } = {
         user: {
@@ -176,12 +182,26 @@ export function createCloudApiClient(args: Args): ApiClient {
           );
         },
         items(name) {
-          return JSON.parse(
-            JSON.stringify(cache[name].items));
+          return JSON.parse(JSON.stringify(cache[name].items));
+        },
+        me() {
+          const jwt = client.getAccessToken();
+          if (jwt) {
+            return cache.user.getters.findOne(
+              cache.user.items,
+              (e) => e._id === jwt.payload.userId,
+            );
+          }
+        },
+        set(name, items) {
+          cache[name].setters.set(cache[name].items, items);
+        },
+        remove(name, items) {
+          cache[name].setters.remove(cache[name].items, items);
         },
       };
     }),
-    storage: createStorage(() => {}),
   });
-  return useApiClient();
+  const client = useApiClient();
+  return client;
 }

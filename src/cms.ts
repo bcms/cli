@@ -1,7 +1,11 @@
+import { readFile } from 'fs/promises';
+import * as FormData from 'form-data';
 import * as path from 'path';
 import * as fse from 'fs-extra';
-import { createTasks, fileReplacer, StringUtil, System } from './util';
+import { Args, createTasks, fileReplacer, StringUtil, System } from './util';
 import { Zip } from './util/zip';
+import type { ApiClient } from '@becomes/cms-cloud-client/types';
+import { login } from './login';
 
 export class CMS {
   static async bundle(): Promise<void> {
@@ -122,5 +126,45 @@ export class CMS {
       },
     ]);
     await tasks.run();
+  }
+  static async deploy({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    if (!(await client.isLoggedIn())) {
+      await login({ args, client });
+    }
+    if (
+      !(await System.exist(path.join(process.cwd(), 'dist', 'bcms.zip'), true))
+    ) {
+      await this.bundle();
+    }
+    const shimJsonPath = path.join(process.cwd(), 'shim.json');
+    if (!(await System.exist(shimJsonPath, true))) {
+      throw Error(`Missing ${shimJsonPath}`);
+    }
+    const shimJson = JSON.parse(await System.readFile(shimJsonPath));
+    const zip = await readFile(path.join(process.cwd(), 'dist', 'bcms.zip'));
+    const formData = new FormData();
+    formData.append('media', zip, 'bcms.zip');
+    const instanceId = shimJson.instanceId;
+    const instances = await client.instance.getAll();
+    const instance = instances.find((e) => e._id === instanceId);
+    if (!instance) {
+      throw Error(
+        `Instance with ID "${instanceId}" cannot be found on your account.`,
+      );
+    }
+    await client.media.set.instanceZip({
+      orgId: instance.org.id,
+      instanceId,
+      formData: formData as any,
+      onProgress(progress) {
+        console.log(`Uploaded ${progress}%`);
+      },
+    });
   }
 }
