@@ -6,6 +6,7 @@ import { Args, createTasks, fileReplacer, StringUtil, System } from './util';
 import { Zip } from './util/zip';
 import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import { login } from './login';
+import { prompt } from 'inquirer';
 
 export class CMS {
   static async bundle(): Promise<void> {
@@ -158,13 +159,29 @@ export class CMS {
         `Instance with ID "${instanceId}" cannot be found on your account.`,
       );
     }
-    await client.media.set.instanceZip({
-      orgId: instance.org.id,
-      instanceId,
-      formData: formData as any,
-      onProgress(progress) {
-        console.log(`Uploaded ${progress}%`);
+    const org = await client.org.get({ id: instance.org.id });
+    if (!org) {
+      throw Error(`Failed to find Organization with ID "${instance.org.id}"`);
+    }
+    const confirm = await prompt<{ yes: boolean }>([
+      {
+        name: 'yes',
+        type: 'confirm',
+        message: [
+          `Are you can to upload new code to ${instance.name} in`,
+          `organization ${org.name}? This action is irreversible.`,
+        ].join(' '),
       },
-    });
+    ]);
+    if (confirm.yes) {
+      await client.media.set.instanceZip({
+        orgId: instance.org.id,
+        instanceId,
+        formData: formData as any,
+        onProgress(progress) {
+          console.log(`Uploaded ${progress}%`);
+        },
+      });
+    }
   }
 }
