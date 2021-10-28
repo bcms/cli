@@ -17,9 +17,15 @@ import { Plugin } from '../plugin';
 import { parseArgs, System } from '../util';
 import { login } from '../login';
 import { logout } from '../logout';
+import { createPurpleCheetah } from '@becomes/purple-cheetah';
+import type { PurpleCheetah } from '@becomes/purple-cheetah/types';
+import { createServerController } from '../server';
 
 async function main() {
   const args = parseArgs(process.argv);
+  if (!args.cloudOrigin) {
+    args.cloudOrigin = 'https://cloud.thebcms.com';
+  }
   const storageFilePath = path.join(homedir(), '.bcms', 'cli.db.json');
   const storage = createStorage(() => {
     const store: {
@@ -109,6 +115,19 @@ async function main() {
   const client = createCloudApiClient({
     args,
     storage,
+  });
+  await new Promise<PurpleCheetah>((resolve, reject) => {
+    try {
+      createPurpleCheetah({
+        port: 1278,
+        controllers: [createServerController({ client })],
+        onReady(pc) {
+          resolve(pc);
+        },
+      });
+    } catch (error) {
+      reject(error);
+    }
   });
   if (args.login) {
     await login({ client, args });
