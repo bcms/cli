@@ -113,8 +113,8 @@ export function createCloudApiClient({
   createApiClient({
     disableSocket: true,
     apiOrigin: args.cloudOrigin
-      ? args.cloudOrigin + '/api/v1/gql'
-      : 'https://cloud.thebcms.com/api/v1/gql',
+      ? args.cloudOrigin
+      : 'https://cloud.thebcms.com',
     throwable: useThrowable(),
     storage,
     router: {
@@ -175,11 +175,11 @@ export function createCloudApiClient({
           );
         },
         findOne(name, query) {
-          return JSON.parse(
-            JSON.stringify(
-              cache[name].getters.findOne(cache[name].items, query as never),
-            ),
+          const result = cache[name].getters.findOne(
+            cache[name].items,
+            query as never,
           );
+          return result ? JSON.parse(JSON.stringify(result)) : null;
         },
         items(name) {
           return JSON.parse(JSON.stringify(cache[name].items));
