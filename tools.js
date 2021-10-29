@@ -99,6 +99,15 @@ async function bundle() {
       },
     },
     {
+      title: 'Copy public assets.',
+      task: async () => {
+        await fse.copy(
+          path.join(process.cwd(), 'src', 'public'),
+          path.join(process.cwd(), 'dist', 'public'),
+        );
+      },
+    },
+    {
       title: 'Copy package.json.',
       task: async () => {
         const data = JSON.parse(

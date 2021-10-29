@@ -10,26 +10,6 @@ export async function login({
   args: Args;
   client: ApiClient;
 }) {
-  // if (!args.email) {
-  //   const result = await prompt<{ email: string }>([
-  //     {
-  //       type: 'input',
-  //       name: 'email',
-  //       message: 'Email: ',
-  //     },
-  //   ]);
-  //   args.email = result.email;
-  // }
-  // if (!args.password) {
-  //   const result = await prompt<{ password: string }>([
-  //     {
-  //       type: 'password',
-  //       name: 'password',
-  //       message: 'Password: ',
-  //     },
-  //   ]);
-  //   args.password = result.password;
-  // }
   if (await client.isLoggedIn()) {
     try {
       await client.auth.logout();
@@ -37,15 +17,16 @@ export async function login({
       console.warn('Failed to logout previous user...');
     }
   }
-  await open(
-    `${args.cloudOrigin}/login?type=cb&d=${Buffer.from(
-      JSON.stringify({ host: 'http://localhost:1287' }),
-    ).toString('base64url')}`,
-  );
-  const unsub = EventManager.subscribe('login', async () => {
-    unsub();
-    console.log('You are now logged in to the BCMS Cloud.');
-    process.exit(0);
+  const url = `${args.cloudOrigin}/login?type=cb&d=${Buffer.from(
+    JSON.stringify({ host: 'http://localhost:1278' }),
+  ).toString('base64url')}`;
+  await open(url);
+  console.log(`Open URL in your browser to login to the BCMS Cloud: ${url}`);
+  await new Promise<void>((resolve) => {
+    const unsub = EventManager.subscribe('login', async () => {
+      unsub();
+      console.log('You are now logged in to the BCMS Cloud.');
+      resolve();
+    });
   });
-  // await client.auth.loginOtp(args.email, args.password);
 }

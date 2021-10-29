@@ -1,5 +1,6 @@
 export * from './args';
 export * from './file-replacer';
+export * from './instance-id';
 export * from './queue';
 export * from './string';
 export * from './system';

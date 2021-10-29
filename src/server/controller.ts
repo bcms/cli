@@ -29,7 +29,7 @@ export function createServerController({
             await client.auth.loginOtp(request.query.otp as string);
             EventManager.trigger('login');
             response.setHeader('Content-Type', 'text/html');
-            return `<h1>You are not logged in and you can safely close this tab.</h1>`;
+            return `<h1>You are now logged in and you can safely close this tab.</h1>`;
           },
         }),
       };

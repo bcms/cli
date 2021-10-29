@@ -16,7 +16,8 @@
     "unlink:sudo": "node tools.js --unlink --sudo",
     "publish": "node tools.js --publish",
     "pack": "node tools.js --pack",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "t": "ts-node src/test.ts"
   },
   "dependencies": {
     "@becomes/cms-cloud-client": "file:bcms-cloud-client.tgz",

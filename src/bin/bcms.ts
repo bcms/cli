@@ -17,7 +17,12 @@ import { Plugin } from '../plugin';
 import { parseArgs, System } from '../util';
 import { login } from '../login';
 import { logout } from '../logout';
-import { createPurpleCheetah } from '@becomes/purple-cheetah';
+import {
+  createBodyParserMiddleware,
+  createCorsMiddleware,
+  createPurpleCheetah,
+  createRequestLoggerMiddleware,
+} from '@becomes/purple-cheetah';
 import type { PurpleCheetah } from '@becomes/purple-cheetah/types';
 import { createServerController } from '../server';
 
@@ -120,6 +125,12 @@ async function main() {
     try {
       createPurpleCheetah({
         port: 1278,
+        staticContentDir: path.join(__dirname, '..', 'public'),
+        middleware: [
+          createCorsMiddleware(),
+          createBodyParserMiddleware(),
+          createRequestLoggerMiddleware(),
+        ],
         controllers: [createServerController({ client })],
         onReady(pc) {
           resolve(pc);
@@ -134,10 +145,12 @@ async function main() {
   } else if (args.logout) {
     await logout({ args, client });
   } else if (args.cms) {
-    if (args.bundle) {
+    if (args.cms === 'bundle') {
       await CMS.bundle();
-    } else if (typeof args.deploy === 'string') {
+    } else if (args.cms === 'deploy') {
       await CMS.deploy({ args, client });
+    } else if (args.cms === 'clone') {
+      await CMS.clone({ args, client });
     }
   } else if (args.plugin) {
     if (args.bundle) {
@@ -152,6 +165,9 @@ async function main() {
       await Instance.run(args);
     }
   }
+  setTimeout(() => {
+    process.exit(0);
+  }, 200);
 }
 
 main().catch((error) => {

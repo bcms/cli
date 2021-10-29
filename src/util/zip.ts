@@ -15,4 +15,14 @@ export class Zip {
     }
     return zip.toBuffer();
   }
+  static unzip({
+    location,
+    buffer,
+  }: {
+    location: string;
+    buffer: Buffer;
+  }): void {
+    const zip = new AdmZip(buffer);
+    zip.extractAllTo(location);
+  }
 }

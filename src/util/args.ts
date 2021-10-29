@@ -6,7 +6,7 @@ export interface Args {
   public?: boolean;
   instance?: string;
   run?: boolean;
-  cms?: boolean;
+  cms?: string;
   cloudOrigin?: string;
   login?: boolean;
   logout?: boolean;
@@ -63,7 +63,7 @@ export function parseArgs(rawArgs: string[]): Args {
     public: getArg(['--public', '--p'], 'boolean'),
     instance: getArg(['--instance', '--i'], 'string'),
     run: getArg(['--run'], 'boolean'),
-    cms: getArg(['--cms'], 'boolean'),
+    cms: getArg(['--cms'], 'string'),
     deploy: getArg(['--deploy', '--d'], 'string'),
     cloudOrigin: getArg(['--cloud-origin', '--co'], 'string'),
     email: getArg(['--email'], 'string'),

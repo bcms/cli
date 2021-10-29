@@ -1,9 +1,16 @@
-import { readFile } from 'fs/promises';
+import { readFile, mkdir } from 'fs/promises';
 import * as FormData from 'form-data';
 import * as path from 'path';
 import * as fse from 'fs-extra';
-import { Args, createTasks, fileReplacer, StringUtil, System } from './util';
-import { Zip } from './util/zip';
+import {
+  Args,
+  createTasks,
+  fileReplacer,
+  getInstanceId,
+  StringUtil,
+  System,
+  Zip
+} from './util';
 import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import { login } from './login';
 import { prompt } from 'inquirer';
@@ -143,15 +150,10 @@ export class CMS {
     ) {
       await this.bundle();
     }
-    const shimJsonPath = path.join(process.cwd(), 'shim.json');
-    if (!(await System.exist(shimJsonPath, true))) {
-      throw Error(`Missing ${shimJsonPath}`);
-    }
-    const shimJson = JSON.parse(await System.readFile(shimJsonPath));
+    const instanceId = await getInstanceId();
     const zip = await readFile(path.join(process.cwd(), 'dist', 'bcms.zip'));
     const formData = new FormData();
     formData.append('media', zip, 'bcms.zip');
-    const instanceId = shimJson.instanceId;
     const instances = await client.instance.getAll();
     const instance = instances.find((e) => e._id === instanceId);
     if (!instance) {
@@ -168,7 +170,7 @@ export class CMS {
         name: 'yes',
         type: 'confirm',
         message: [
-          `Are you can to upload new code to ${instance.name} in`,
+          `Are you sure you want to upload new code to ${instance.name} in`,
           `organization ${org.name}? This action is irreversible.`,
         ].join(' '),
       },
@@ -183,5 +185,127 @@ export class CMS {
         },
       });
     }
+  }
+  static async clone({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    if (!(await client.isLoggedIn())) {
+      await login({ args, client });
+    }
+    const orgs = await client.org.getAll();
+    const instances = await client.instance.getAll();
+    const promptResult = await prompt<{ orgId: string; instanceId: string }>([
+      {
+        name: 'orgId',
+        type: 'list',
+        choices: orgs.map((org) => {
+          return {
+            name: org.name,
+            value: org._id,
+          };
+        }),
+        message: 'Select an organization:',
+      },
+      {
+        name: 'instanceId',
+        type: 'list',
+        choices: instances.map((inst) => {
+          return {
+            name: inst.name,
+            value: inst._id,
+          };
+        }),
+        message: 'Select an instance:',
+      },
+    ]);
+    const org = orgs.find((e) => e._id === promptResult.orgId);
+    if (!org) {
+      throw Error(
+        `Organization with ID "${promptResult.orgId}" does not exist.`,
+      );
+    }
+    const instance = instances.find((e) => e._id === promptResult.instanceId);
+    if (!instance) {
+      throw Error(
+        `Instance with ID "${promptResult.instanceId}" does not exist.`,
+      );
+    }
+    const repoName = `${org.nameEncoded}-${instance.nameEncoded}`;
+    const repoPath = path.join(process.cwd(), repoName);
+    const tasks = createTasks([
+      {
+        title: 'Clone base GitHub repository',
+        task: async () => {
+          await System.spawn('git', [
+            'clone',
+            'https://github.com/becomesco/cms',
+            repoName,
+          ]);
+          // TODO: Remove this line when ready for production
+          await System.spawn('git', ['checkout', 'next'], {
+            stdio: 'inherit',
+            cwd: repoPath,
+          });
+        },
+      },
+      {
+        title: 'Get instance data',
+        task: async () => {
+          console.log('zip', instance.zip);
+          if (instance.zip) {
+            const buffer = await client.media.get.instanceZip({
+              orgId: org._id,
+              instanceId: instance._id,
+              onProgress(value) {
+                console.log(`Downloading bcms.zip: ${value}%`);
+              },
+            });
+            const tmpName = '__ziptmp';
+            const tmpPath = path.join(repoPath, tmpName);
+            await mkdir(tmpPath);
+            Zip.unzip({ location: tmpPath, buffer });
+            await fse.remove(path.join(repoPath, 'src'));
+            await fse.copy(
+              path.join(repoPath, tmpName, '_src'),
+              path.join(repoPath, 'src'),
+            );
+            const customPackageJson = JSON.parse(
+              await System.readFile(
+                path.join(repoPath, tmpName, 'custom-package.json'),
+              ),
+            );
+            const packageJson = JSON.parse(
+              await System.readFile(path.join(repoPath, 'package.json')),
+            );
+            for (const depName in customPackageJson.dependencies) {
+              packageJson.dependencies[depName] =
+                customPackageJson.dependencies[depName];
+            }
+            await System.writeFile(
+              path.join(repoPath, 'package.json'),
+              JSON.stringify(packageJson, null, '  '),
+            );
+            await fse.remove(path.join(repoPath, tmpName));
+          }
+          await System.writeFile(
+            path.join(repoPath, 'shim.json'),
+            JSON.stringify(
+              {
+                code: 'local',
+                local: true,
+                instanceId: instance._id,
+              },
+              null,
+              '  ',
+            ),
+          );
+        },
+      },
+    ]);
+    await tasks.run();
   }
 }
