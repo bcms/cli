@@ -2,6 +2,8 @@ import * as path from 'path';
 import * as fse from 'fs-extra';
 import { Args, createTasks, System } from './util';
 import { prompt } from 'inquirer';
+import type { ApiClient } from '@becomes/cms-cloud-client/types';
+import { login } from './login';
 
 export class Instance {
   static async run(_args: Args): Promise<void> {
@@ -368,5 +370,10 @@ export class Instance {
       },
     ]);
     await mainTasks.run();
+  }
+  static async install({args, client}: {args: Args, client: ApiClient}): Promise<void> {
+    if (!(await client.isLoggedIn())) {
+      await login({ args, client });
+    }
   }
 }

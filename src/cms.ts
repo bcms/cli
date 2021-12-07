@@ -7,9 +7,10 @@ import {
   createTasks,
   fileReplacer,
   getInstanceId,
+  Select,
   StringUtil,
   System,
-  Zip
+  Zip,
 } from './util';
 import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import { login } from './login';
@@ -196,44 +197,7 @@ export class CMS {
     if (!(await client.isLoggedIn())) {
       await login({ args, client });
     }
-    const orgs = await client.org.getAll();
-    const instances = await client.instance.getAll();
-    const promptResult = await prompt<{ orgId: string; instanceId: string }>([
-      {
-        name: 'orgId',
-        type: 'list',
-        choices: orgs.map((org) => {
-          return {
-            name: org.name,
-            value: org._id,
-          };
-        }),
-        message: 'Select an organization:',
-      },
-      {
-        name: 'instanceId',
-        type: 'list',
-        choices: instances.map((inst) => {
-          return {
-            name: inst.name,
-            value: inst._id,
-          };
-        }),
-        message: 'Select an instance:',
-      },
-    ]);
-    const org = orgs.find((e) => e._id === promptResult.orgId);
-    if (!org) {
-      throw Error(
-        `Organization with ID "${promptResult.orgId}" does not exist.`,
-      );
-    }
-    const instance = instances.find((e) => e._id === promptResult.instanceId);
-    if (!instance) {
-      throw Error(
-        `Instance with ID "${promptResult.instanceId}" does not exist.`,
-      );
-    }
+    const { org, instance } = await Select.orgAndInstance({ client });
     const repoName = `${org.nameEncoded}-${instance.nameEncoded}`;
     const repoPath = path.join(process.cwd(), repoName);
     const tasks = createTasks([

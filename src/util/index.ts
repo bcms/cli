@@ -2,6 +2,7 @@ export * from './args';
 export * from './file-replacer';
 export * from './instance-id';
 export * from './queue';
+export * from './select';
 export * from './string';
 export * from './system';
 export * from './tasks';
