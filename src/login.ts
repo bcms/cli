@@ -1,4 +1,5 @@
 import * as open from 'open';
+import { prompt } from 'inquirer';
 import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import type { Args } from './util';
 import { EventManager } from './event';
@@ -9,7 +10,7 @@ export async function login({
 }: {
   args: Args;
   client: ApiClient;
-}) {
+}): Promise<void> {
   if (await client.isLoggedIn()) {
     try {
       await client.auth.logout();
@@ -17,16 +18,36 @@ export async function login({
       console.warn('Failed to logout previous user...');
     }
   }
-  const url = `${args.cloudOrigin}/login?type=cb&d=${Buffer.from(
-    JSON.stringify({ host: 'http://localhost:1278' }),
-  ).toString('base64url')}`;
-  await open(url);
-  console.log(`Open URL in your browser to login to the BCMS Cloud: ${url}`);
-  await new Promise<void>((resolve) => {
-    const unsub = EventManager.subscribe('login', async () => {
-      unsub();
-      console.log('You are now logged in to the BCMS Cloud.');
-      resolve();
+  if (args.otp) {
+    await client.auth.loginOtp(args.otp);
+    console.log('You are now logged in to the BCMS Cloud.');
+  } else if (args.terminalLogin) {
+    const result = await prompt<{ email: string; password: string }>([
+      {
+        type: 'input',
+        message: 'Email: ',
+        name: 'email',
+      },
+      {
+        type: 'password',
+        message: 'Password: ',
+        name: 'password',
+      },
+    ]);
+    await client.auth.login(result.email, result.password);
+    console.log('You are now logged in to the BCMS Cloud.');
+  } else {
+    const url = `${args.cloudOrigin}/login?type=cb&d=${Buffer.from(
+      JSON.stringify({ host: 'http://localhost:1278' }),
+    ).toString('base64url')}`;
+    await open(url);
+    console.log(`Open URL in your browser to login to the BCMS Cloud: ${url}`);
+    await new Promise<void>((resolve) => {
+      const unsub = EventManager.subscribe('login', async () => {
+        unsub();
+        console.log('You are now logged in to the BCMS Cloud.');
+        resolve();
+      });
     });
-  });
+  }
 }

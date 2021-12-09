@@ -13,6 +13,9 @@ export interface Args {
   email?: string;
   password?: string;
   deploy?: string;
+  otp?: string;
+  terminalLogin?: boolean;
+  install?: boolean;
 }
 
 export function parseArgs(rawArgs: string[]): Args {
@@ -53,20 +56,165 @@ export function parseArgs(rawArgs: string[]): Args {
       return (args[names[0]] === '' || args[names[0]] === 'true' || false) as T;
     }
   }
-  return {
-    login: getArg(['--login'], 'boolean'),
-    logout: getArg(['--logout'], 'boolean'),
-    bundle: getArg(['--bundle', '--b'], 'boolean'),
-    plugin: getArg(['--plugin', '--pl'], 'boolean'),
-    create: getArg(['--create', '--c'], 'boolean'),
-    function: getArg(['--function', '--f'], 'string'),
-    public: getArg(['--public', '--p'], 'boolean'),
-    instance: getArg(['--instance', '--i'], 'string'),
-    run: getArg(['--run'], 'boolean'),
-    cms: getArg(['--cms'], 'string'),
-    deploy: getArg(['--deploy', '--d'], 'string'),
-    cloudOrigin: getArg(['--cloud-origin', '--co'], 'string'),
-    email: getArg(['--email'], 'string'),
-    password: getArg(['--password'], 'string'),
+  const groupsRaw: {
+    [name: string]: {
+      type: 'string' | 'boolean';
+    };
+  } = {
+    login: {
+      type: 'boolean',
+    },
+    logout: {
+      type: 'boolean',
+    },
+    bundle: {
+      type: 'boolean',
+    },
+    plugin: {
+      type: 'boolean',
+    },
+    create: {
+      type: 'boolean',
+    },
+    function: {
+      type: 'string',
+    },
+    public: {
+      type: 'boolean',
+    },
+    instance: {
+      type: 'string',
+    },
+    run: {
+      type: 'boolean',
+    },
+    cms: {
+      type: 'string',
+    },
+    deploy: {
+      type: 'string',
+    },
+    cloudOrigin: {
+      type: 'string',
+    },
+    email: {
+      type: 'string',
+    },
+    password: {
+      type: 'string',
+    },
+    otp: {
+      type: 'string',
+    },
+    terminalLogin: {
+      type: 'boolean',
+    },
+    install: {
+      type: 'boolean',
+    },
   };
+  const groups: {
+    [name: string]: {
+      name: string;
+      type: 'string' | 'boolean';
+    };
+  } = {};
+  for (const groupName in groupsRaw) {
+    const groupRaw = groupsRaw[groupName];
+    groups[groupName] = {
+      name: groupName,
+      type: groupRaw.type,
+    };
+  }
+  const myArgs: {
+    [name: string]: string;
+  } = {
+    '--login': groups.login.name,
+
+    '--logout': groups.logout.name,
+
+    '--bundle': groups.bundle.name,
+    '--b': groups.bundle.name,
+
+    '--plugin': groups.plugin.name,
+    '--pl': groups.plugin.name,
+
+    '--create': groups.create.name,
+    '--c': groups.create.name,
+
+    '--function': groups.function.name,
+    '--f': groups.function.name,
+
+    '--public': groups.public.name,
+    '--p': groups.public.name,
+
+    '--instance': groups.instance.name,
+    '--i': groups.instance.name,
+
+    '--run': groups.run.name,
+    '--r': groups.run.name,
+
+    '--cms': groups.cms.name,
+
+    '--deploy': groups.deploy.name,
+    '--d': groups.deploy.name,
+
+    '--cloud-origin': groups.cloudOrigin.name,
+    '--co': groups.cloudOrigin.name,
+
+    '--email': groups.email.name,
+
+    '--password': groups.password.name,
+
+    '--otp': groups.otp.name,
+
+    '--terminal-login': groups.terminalLogin.name,
+
+    '--install': groups.install.name,
+  };
+  const output: {
+    [name: string]: string | boolean | undefined;
+  } = {};
+  const collectedArgs: {
+    [group: string]: {
+      names: string[];
+      type: 'string' | 'boolean';
+    };
+  } = {};
+  for (const argName in myArgs) {
+    const groupName = myArgs[argName];
+    const group = groups[groupName];
+    if (!collectedArgs[groupName]) {
+      collectedArgs[groupName] = {
+        names: [argName],
+        type: group.type,
+      };
+    } else {
+      collectedArgs[groupName].names.push(argName);
+    }
+  }
+  for (const group in collectedArgs) {
+    const argData = collectedArgs[group];
+    output[group] = getArg(argData.names, argData.type);
+  }
+  return output;
+  // return {
+  //   login: getArg(['--login'], 'boolean'),
+  //   logout: getArg(['--logout'], 'boolean'),
+  //   bundle: getArg(['--bundle', '--b'], 'boolean'),
+  //   plugin: getArg(['--plugin', '--pl'], 'boolean'),
+  //   create: getArg(['--create', '--c'], 'boolean'),
+  //   function: getArg(['--function', '--f'], 'string'),
+  //   public: getArg(['--public', '--p'], 'boolean'),
+  //   instance: getArg(['--instance', '--i'], 'string'),
+  //   run: getArg(['--run'], 'boolean'),
+  //   cms: getArg(['--cms'], 'string'),
+  //   deploy: getArg(['--deploy', '--d'], 'string'),
+  //   cloudOrigin: getArg(['--cloud-origin', '--co'], 'string'),
+  //   email: getArg(['--email'], 'string'),
+  //   password: getArg(['--password'], 'string'),
+  //   otp: getArg(['--otp'], 'string'),
+  //   terminalLogin: getArg(['--terminal-login'], 'boolean'),
+  //   install: getArg(['--install']),
+  // };
 }

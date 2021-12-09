@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { mkdir } from 'fs/promises';
 import { homedir } from 'os';
@@ -25,13 +26,14 @@ import {
 } from '@becomes/purple-cheetah';
 import type { PurpleCheetah } from '@becomes/purple-cheetah/types';
 import { createServerController } from '../server';
+import { Config } from '../config';
 
 async function main() {
   const args = parseArgs(process.argv);
   if (!args.cloudOrigin) {
     args.cloudOrigin = 'https://cloud.thebcms.com';
   }
-  const storageFilePath = path.join(homedir(), '.bcms', 'cli.db.json');
+  const storageFilePath = path.join(Config.fsDir, 'cli.db.json');
   const storage = createStorage(() => {
     const store: {
       [key: string]: any;
@@ -125,6 +127,7 @@ async function main() {
     try {
       createPurpleCheetah({
         port: 1278,
+        silentLogs: true,
         staticContentDir: path.join(__dirname, '..', 'public'),
         middleware: [
           createCorsMiddleware(),
@@ -160,9 +163,11 @@ async function main() {
     if (args.create) {
       await Function.create(args);
     }
-  } else if (args.instance) {
+  } else if (typeof args.instance === 'string') {
     if (args.run) {
       await Instance.run(args);
+    } else if (args.install) {
+      await Instance.install({ args, client });
     }
   }
   setTimeout(() => {

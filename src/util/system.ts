@@ -1,6 +1,6 @@
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
+import { stat } from 'fs';
 import * as path from 'path';
-import * as util from 'util';
 import { SpawnOptions, spawn, exec, ExecOptions } from 'child_process';
 
 export interface SystemExecOutput {
@@ -75,16 +75,16 @@ export class System {
     return output;
   }
   static async readdir(location: string): Promise<string[]> {
-    return await util.promisify(fs.readdir)(location);
+    return await fs.readdir(location);
   }
   static async readFile(location: string): Promise<string> {
-    return (await util.promisify(fs.readFile)(location)).toString();
+    return (await fs.readFile(location)).toString();
   }
   static async writeFile(
     location: string,
     data: string | Buffer,
   ): Promise<void> {
-    await util.promisify(fs.writeFile)(location, data);
+    await fs.writeFile(location, data);
   }
   static async fileTree(
     startingLocation: string,
@@ -100,12 +100,12 @@ export class System {
       abs: string;
     }> = [];
     const basePath = path.join(startingLocation, location);
-    const files = await util.promisify(fs.readdir)(basePath);
+    const files = await fs.readdir(basePath);
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const filePath = path.join(basePath, file);
-      const stat = await util.promisify(fs.lstat)(filePath);
-      if (stat.isDirectory()) {
+      const lstat = await fs.lstat(filePath);
+      if (lstat.isDirectory()) {
         const children = await this.fileTree(
           startingLocation,
           path.join(location, file),
@@ -126,7 +126,7 @@ export class System {
   static async exist(location: string, isFile?: boolean): Promise<boolean> {
     return new Promise<boolean>((resolve, reject) => {
       const pth = location.startsWith('/') ? location : location;
-      fs.stat(pth, (err, stats) => {
+      stat(pth, (err, stats) => {
         if (err) {
           if (err.code === 'ENOENT') {
             resolve(false);
@@ -143,5 +143,22 @@ export class System {
         }
       });
     });
+  }
+  static async mkdir(location: string): Promise<void> {
+    await fs.mkdir(location);
+  }
+  static execHelper(output: {
+    out: string;
+    err: string;
+  }): (type: 'stdout' | 'stderr', chunk: string) => void {
+    output.out = '';
+    output.err = '';
+    return (type, chunk) => {
+      if (type === 'stdout') {
+        output.out += chunk;
+      } else {
+        output.err += chunk;
+      }
+    };
   }
 }
