@@ -673,51 +673,140 @@ export class Instance {
      * System setup
      */
     const mainTasks = createTasks([
+      // {
+      //   title: 'Verify BCMS license',
+      //   async task() {
+      //     if (
+      //       license.value.indexOf('---- BEGIN BCMS LICENSE ----') === -1 ||
+      //       license.value.indexOf('---- END BCMS LICENSE ----') === -1 ||
+      //       license.value.split('\n').length !== 24
+      //     ) {
+      //       throw Error(
+      //         [
+      //           `Invalid license format of "${license.fileName}".`,
+      //           'If you did not change the license file and you obtained it',
+      //           'via "https://cloud.thebcms.com", please contact the support.',
+      //         ].join(' '),
+      //       );
+      //     }
+      //   },
+      // },
+      // {
+      //   title: 'Create BCMS user',
+      //   async task() {
+      //     const exo = {
+      //       out: '',
+      //       err: '',
+      //     };
+      //     await System.exec(['id', '-u', 'bcms'].join(' '), {
+      //       onChunk: System.execHelper(exo),
+      //       doNotThrowError: true,
+      //     }).awaiter;
+      //     if (exo.err) {
+      //       if (exo.err.indexOf('no such user') !== -1) {
+      //         await System.spawn('sudo', [
+      //           'adduser',
+      //           '--disabled-password',
+      //           '--gecos',
+      //           '"BCMS"',
+      //           'bcms',
+      //         ]);
+      //       } else {
+      //         throw Error(exo.err);
+      //       }
+      //     } else if (!exo.out) {
+      //       throw Error(
+      //         [
+      //           'Cannot find/create user "bcms".',
+      //           'You will need to create it manually.',
+      //         ].join(' '),
+      //       );
+      //     }
+      //   },
+      // },
+      // {
+      //   title: 'Add BCMS user to the Docker group',
+      //   async task() {
+      //     await System.spawn('sudo', ['usermod', '-aG', 'docker', 'bcms']);
+      //   },
+      // },
+      // {
+      //   title: 'Prepare BCMS users home directory.',
+      //   async task() {
+      //     if (!(await System.exist('/home/bcms/storage'))) {
+      //       await System.spawn('mkdir', ['/home/bcms/storage']);
+      //       await System.spawn('chown', [
+      //         '-R',
+      //         'bcms:bcms',
+      //         '/home/bcms/storage',
+      //       ]);
+      //     }
+      //     if (!(await System.exist('/home/bcms/licenses'))) {
+      //       await System.spawn('mkdir', ['/home/bcms/licenses']);
+      //       await System.spawn('chown', [
+      //         '-R',
+      //         'bcms:bcms',
+      //         '/home/bcms/licenses',
+      //       ]);
+      //     }
+      //     await System.writeFile(
+      //       `/home/bcms/licenses/${license.fileName}`,
+      //       license.value,
+      //     );
+      //     await System.spawn('chown', [
+      //       '-R',
+      //       'bcms:bcms',
+      //       `/home/bcms/licenses/${license.fileName}`,
+      //     ]);
+      //   },
+      // },
+      // {
+      //   title: 'Pull Docker BCMS Shim image',
+      //   async task() {
+      //     await System.spawn('docker', ['pull', 'becomes/cms-shim']);
+      //   },
+      // },
       {
-        title: 'Verify BCMS license',
-        async task() {
-          if (
-            license.value.indexOf('---- BEGIN BCMS LICENSE ----') === -1 ||
-            license.value.indexOf('---- END BCMS LICENSE ----') === -1 ||
-            license.value.split('\n').length !== 24
-          ) {
-            throw Error(
-              [
-                `Invalid license format of "${license.fileName}".`,
-                'If you did not change the license file and you obtained it',
-                'via "https://cloud.thebcms.com", please contact the support.',
-              ].join(' '),
-            );
-          }
-        },
-      },
-      {
-        title: 'Create BCMS user',
+        title: 'Setup Docker network',
         async task() {
           const exo = {
             out: '',
             err: '',
           };
-          await System.exec(['id', '-u', 'bcms'].join(' '), {
-            onChunk: System.execHelper(exo),
-            doNotThrowError: true,
-          }).awaiter;
+          await System.exec(
+            [
+              'docker',
+              'network',
+              'create',
+              '-d',
+              'bridge',
+              '--subnet',
+              '10.20.30.0/16',
+              '--ip-range',
+              '10.20.30.128/24',
+              '--gateway',
+              '10.20.30.1',
+              'bcms',
+            ].join(' '),
+            {
+              onChunk: System.execHelper(exo),
+              doNotThrowError: true,
+            },
+          ).awaiter;
           if (exo.err) {
-            if (exo.err.indexOf('no such user') !== -1) {
-              await System.spawn('sudo', [
-                'adduser',
-                '--disabled-password',
-                '--gecos',
-                '"BCMS"',
-                'bcms',
-              ]);
-            } else {
-              throw Error(exo.err);
+            if (!exo.err.includes('network with name bcms already exists')) {
+              throw Error(
+                [
+                  '[e1] Cannot create "bcms" docker network.',
+                  'You will need to create it manually. ---',
+                  exo.err,
+                ].join(' '),
+              );
             }
           } else if (!exo.out) {
             throw Error(
               [
-                'Cannot find/create user "bcms".',
+                '[e2] Cannot create "bcms" docker network.',
                 'You will need to create it manually.',
               ].join(' '),
             );
@@ -725,130 +814,111 @@ export class Instance {
         },
       },
       {
-        title: 'Add BCMS user to the Docker group',
-        async task() {
-          await System.spawn('sudo', ['usermod', '-aG', 'docker', 'bcms']);
-        },
-      },
-      {
-        title: 'Prepare BCMS users home directory.',
-        async task() {
-          if (!(await System.exist('/home/bcms/storage'))) {
-            await System.spawn('mkdir', ['/home/bcms/storage']);
-            await System.spawn('chown', [
-              '-R',
-              'bcms:bcms',
-              '/home/bcms/storage',
-            ]);
-          }
-          if (!(await System.exist('/home/bcms/licenses'))) {
-            await System.spawn('mkdir', ['/home/bcms/licenses']);
-            await System.spawn('chown', [
-              '-R',
-              'bcms:bcms',
-              '/home/bcms/licenses',
-            ]);
-          }
-          await System.writeFile(
-            `/home/bcms/licenses/${license.fileName}`,
-            license.value,
-          );
-          await System.spawn('chown', [
-            '-R',
-            'bcms:bcms',
-            `/home/bcms/licenses/${license.fileName}`,
-          ]);
-        },
-      },
-      {
-        title: 'Pull Docker BCMS Shim image',
-        async task() {
-          await System.spawn('docker', ['pull', 'becomes/cms-shim']);
-        },
-      },
-      {
         title: 'Setup database',
         async task() {
-          
-        }
-      },
-      {
-        title: 'Run BCMS Shim container',
-        async task() {
-          await System.exec(
-            [
-              'cd /home/bcms',
-              '&&',
-              'su bcms -y',
-              '&&',
-              'ls -l',
-              '&&',
-              'docker',
-              'run',
-              '-d',
-              '-p',
-              '1279:1279',
-              '-v',
-              '/var/run/docker.sock:/var/run/docker.sock',
-              '-v',
-              '/home/bcms/storage:/app/storage',
-              '-v',
-              '/home/bcms/licenses:/app/licenses',
-              '-e',
-              'PORT=1279',
-              '-e',
-              'BCMS_CLOUD_DOMAIN=cloud.thebcms.com',
-              '-e',
-              'BCMS_CLOUD_PORT=443',
-              '-e',
-              'BCMS_MANAGE=true',
-              '--name',
-              'bcms-shim',
-              'becomes/cms-shim',
-              '&&',
-              'ls -l',
-            ].join(' '),
-            {
-              onChunk(type, chunk) {
-                process[type].write(chunk);
+          const databaseType = (
+            await prompt<{ databaseType: string }>([
+              {
+                message: 'Which database would you like to use?',
+                name: 'databaseType',
+                type: 'list',
+                choices: [
+                  {
+                    name: 'Automatic - CLI will setup recommended DB on your server',
+                    value: 'auto',
+                  },
+                  {
+                    name: 'MongoDB Atlas',
+                    value: 'mongoAtlas',
+                  },
+                  {
+                    name: 'MongoDB Self-hosted',
+                    value: 'mongoSelfHosted',
+                  },
+                ],
               },
-            },
-          ).awaiter;
+            ])
+          ).databaseType;
+          console.log(databaseType);
         },
       },
-      {
-        title: 'Tail the output for 5s',
-        async task() {
-          const proc = System.exec('docker logs --tail 500 -f bcms-shim', {
-            onChunk(type, chunk) {
-              process[type].write(chunk);
-            },
-            doNotThrowError: true,
-          });
-          setTimeout(() => {
-            proc.stop();
-          }, 5000);
-          await proc.awaiter;
-        },
-      },
-      {
-        title: 'Create BCMS user cronjobs',
-        async task() {
-          const cronFile = '/var/spool/cron/crontabs/bcms';
-          if (!(await System.exist(cronFile))) {
-            await System.exec(
-              ['touch', cronFile, '&&', `chmod 600 ${cronFile}`].join(' '),
-            ).awaiter;
-          }
-          await System.writeFile(
-            cronFile,
-            [
-              '@reboot docker start bcms-shim',
-              '0 0 * * * docker start bcms-shim',
-            ].join('\n'),
-          );
-        },
-      },
+      // {
+      //   title: 'Run BCMS Shim container',
+      //   async task() {
+      //     await System.exec(
+      //       [
+      //         'cd /home/bcms',
+      //         '&&',
+      //         'su bcms -y',
+      //         '&&',
+      //         'ls -l',
+      //         '&&',
+      //         'docker',
+      //         'run',
+      //         '-d',
+      //         '-p',
+      //         '1279:1279',
+      //         '-v',
+      //         '/var/run/docker.sock:/var/run/docker.sock',
+      //         '-v',
+      //         '/home/bcms/storage:/app/storage',
+      //         '-v',
+      //         '/home/bcms/licenses:/app/licenses',
+      //         '-e',
+      //         'PORT=1279',
+      //         '-e',
+      //         'BCMS_CLOUD_DOMAIN=cloud.thebcms.com',
+      //         '-e',
+      //         'BCMS_CLOUD_PORT=443',
+      //         '-e',
+      //         'BCMS_MANAGE=true',
+      //         '--name',
+      //         'bcms-shim',
+      //         'becomes/cms-shim',
+      //         '&&',
+      //         'ls -l',
+      //       ].join(' '),
+      //       {
+      //         onChunk(type, chunk) {
+      //           process[type].write(chunk);
+      //         },
+      //       },
+      //     ).awaiter;
+      //   },
+      // },
+      // {
+      //   title: 'Tail the output for 5s',
+      //   async task() {
+      //     const proc = System.exec('docker logs --tail 500 -f bcms-shim', {
+      //       onChunk(type, chunk) {
+      //         process[type].write(chunk);
+      //       },
+      //       doNotThrowError: true,
+      //     });
+      //     setTimeout(() => {
+      //       proc.stop();
+      //     }, 5000);
+      //     await proc.awaiter;
+      //   },
+      // },
+      // {
+      //   title: 'Create BCMS user cronjobs',
+      //   async task() {
+      //     const cronFile = '/var/spool/cron/crontabs/bcms';
+      //     if (!(await System.exist(cronFile))) {
+      //       await System.exec(
+      //         ['touch', cronFile, '&&', `chmod 600 ${cronFile}`].join(' '),
+      //       ).awaiter;
+      //     }
+      //     await System.writeFile(
+      //       cronFile,
+      //       [
+      //         '@reboot docker start bcms-shim',
+      //         '0 0 * * * docker start bcms-shim',
+      //       ].join('\n'),
+      //     );
+      //   },
+      // },
     ]);
     await mainTasks.run();
   }
