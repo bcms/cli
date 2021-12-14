@@ -551,9 +551,9 @@ export class Instance {
      * Get license
      */
     const instances = await client.instance.getAll();
-    let instance: InstanceProtected | null | undefined = args.instance
-      ? instances.find((e) => e._id === args.instance)
-      : null;
+    let instance: InstanceProtected = args.instance
+      ? (instances.find((e) => e._id === args.instance) as InstanceProtected)
+      : (null as never);
     let org: Org | null = null;
     if (instance) {
       try {
@@ -669,10 +669,158 @@ export class Instance {
       );
     }
 
+    type DBType = 'auto' | 'mongoAtlas' | 'mongoSelfHosted';
+    const dbInfo: {
+      type: DBType;
+      user: string;
+      pass: string;
+      name: string;
+      cluster?: string;
+    } = {} as never;
+
     /**
      * System setup
      */
     const mainTasks = createTasks([
+      {
+        title: 'Setup Docker network',
+        async task() {
+          const exo = {
+            out: '',
+            err: '',
+          };
+          await System.exec(
+            [
+              'docker',
+              'network',
+              'create',
+              '-d',
+              'bridge',
+              '--subnet',
+              '10.20.30.0/16',
+              '--ip-range',
+              '10.20.30.128/24',
+              '--gateway',
+              '10.20.30.1',
+              'bcms',
+            ].join(' '),
+            {
+              onChunk: System.execHelper(exo),
+              doNotThrowError: true,
+            },
+          ).awaiter;
+          if (exo.err) {
+            if (!exo.err.includes('network with name bcms already exists')) {
+              throw Error(
+                [
+                  '[e1] Cannot create "bcms" docker network.',
+                  'You will need to create it manually. ---',
+                  exo.err,
+                ].join(' '),
+              );
+            }
+          } else if (!exo.out) {
+            throw Error(
+              [
+                '[e2] Cannot create "bcms" docker network.',
+                'You will need to create it manually.',
+              ].join(' '),
+            );
+          }
+        },
+      },
+      {
+        title: 'Setup database',
+        async task() {
+          let setupDb = true;
+          if (
+            await System.exist(
+              path.join(Config.fsDir, instance._id, 'db-info.json'),
+            )
+          ) {
+            const { yes } = await prompt<{ yes: boolean }>([
+              {
+                message: [
+                  'Database information detected.',
+                  'Would you like to setup database again?',
+                ].join(' '),
+                type: 'confirm',
+                name: 'yes',
+              },
+            ]);
+            setupDb = yes;
+          }
+          if (setupDb) {
+            dbInfo.type = (
+              await prompt<{
+                dbType: 'auto' | 'mongoAtlas' | 'mongoSelfHosted';
+              }>([
+                {
+                  message: 'Which database would you like to use?',
+                  name: 'dbType',
+                  type: 'list',
+                  choices: [
+                    {
+                      name: 'Automatic - CLI will setup recommended DB on your server',
+                      value: 'auto',
+                    },
+                    {
+                      name: 'MongoDB Atlas',
+                      value: 'mongoAtlas',
+                    },
+                    {
+                      name: 'MongoDB Self-hosted',
+                      value: 'mongoSelfHosted',
+                    },
+                  ],
+                },
+              ])
+            ).dbType;
+            if (dbInfo.type === 'mongoAtlas') {
+              const info = await prompt<{
+                user: string;
+                pass: string;
+                name: string;
+                cluster: string;
+              }>([
+                {
+                  message: 'Database username:',
+                  type: 'input',
+                  name: 'user',
+                },
+                {
+                  message: 'Database user password:',
+                  type: 'password',
+                  name: 'pass',
+                },
+                {
+                  message: 'Database name:',
+                  type: 'input',
+                  name: 'name',
+                },
+                {
+                  message: 'Database cluster (ex. my-cluster.mongodb.net):',
+                  type: 'input',
+                  name: 'user',
+                },
+              ]);
+              dbInfo.name = info.name;
+              dbInfo.pass = info.pass;
+              dbInfo.user = info.user;
+              dbInfo.cluster = info.cluster;
+            }
+            await System.writeFile(
+              path.join(Config.fsDir, instance._id, 'db-info.json'),
+              JSON.stringify(dbInfo, null, '  '),
+            );
+            await System.spawn('chown', [
+              '-R',
+              'bcms:bcms',
+              path.join(Config.fsDir, instance._id, 'db-info.json'),
+            ]);
+          }
+        },
+      },
       // {
       //   title: 'Verify BCMS license',
       //   async task() {
@@ -766,82 +914,6 @@ export class Instance {
       //     await System.spawn('docker', ['pull', 'becomes/cms-shim']);
       //   },
       // },
-      {
-        title: 'Setup Docker network',
-        async task() {
-          const exo = {
-            out: '',
-            err: '',
-          };
-          await System.exec(
-            [
-              'docker',
-              'network',
-              'create',
-              '-d',
-              'bridge',
-              '--subnet',
-              '10.20.30.0/16',
-              '--ip-range',
-              '10.20.30.128/24',
-              '--gateway',
-              '10.20.30.1',
-              'bcms',
-            ].join(' '),
-            {
-              onChunk: System.execHelper(exo),
-              doNotThrowError: true,
-            },
-          ).awaiter;
-          if (exo.err) {
-            if (!exo.err.includes('network with name bcms already exists')) {
-              throw Error(
-                [
-                  '[e1] Cannot create "bcms" docker network.',
-                  'You will need to create it manually. ---',
-                  exo.err,
-                ].join(' '),
-              );
-            }
-          } else if (!exo.out) {
-            throw Error(
-              [
-                '[e2] Cannot create "bcms" docker network.',
-                'You will need to create it manually.',
-              ].join(' '),
-            );
-          }
-        },
-      },
-      {
-        title: 'Setup database',
-        async task() {
-          const databaseType = (
-            await prompt<{ databaseType: string }>([
-              {
-                message: 'Which database would you like to use?',
-                name: 'databaseType',
-                type: 'list',
-                choices: [
-                  {
-                    name: 'Automatic - CLI will setup recommended DB on your server',
-                    value: 'auto',
-                  },
-                  {
-                    name: 'MongoDB Atlas',
-                    value: 'mongoAtlas',
-                  },
-                  {
-                    name: 'MongoDB Self-hosted',
-                    value: 'mongoSelfHosted',
-                  },
-                ],
-              },
-            ])
-          ).databaseType;
-          console.log(databaseType);
-        },
-      },
       // {
       //   title: 'Run BCMS Shim container',
       //   async task() {
@@ -858,6 +930,8 @@ export class Instance {
       //         '-d',
       //         '-p',
       //         '1279:1279',
+      //         '--network',
+      //         'bcms',
       //         '-v',
       //         '/var/run/docker.sock:/var/run/docker.sock',
       //         '-v',
@@ -901,24 +975,24 @@ export class Instance {
       //     await proc.awaiter;
       //   },
       // },
-      // {
-      //   title: 'Create BCMS user cronjobs',
-      //   async task() {
-      //     const cronFile = '/var/spool/cron/crontabs/bcms';
-      //     if (!(await System.exist(cronFile))) {
-      //       await System.exec(
-      //         ['touch', cronFile, '&&', `chmod 600 ${cronFile}`].join(' '),
-      //       ).awaiter;
-      //     }
-      //     await System.writeFile(
-      //       cronFile,
-      //       [
-      //         '@reboot docker start bcms-shim',
-      //         '0 0 * * * docker start bcms-shim',
-      //       ].join('\n'),
-      //     );
-      //   },
-      // },
+      {
+        title: 'Create BCMS user cronjobs',
+        async task() {
+          const cronFile = '/var/spool/cron/crontabs/bcms';
+          if (!(await System.exist(cronFile))) {
+            await System.exec(
+              ['touch', cronFile, '&&', `chmod 600 ${cronFile}`].join(' '),
+            ).awaiter;
+          }
+          await System.writeFile(
+            cronFile,
+            [
+              '@reboot docker start bcms-shim',
+              '0 0 * * * docker start bcms-shim',
+            ].join('\n'),
+          );
+        },
+      },
     ]);
     await mainTasks.run();
   }
