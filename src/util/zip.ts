@@ -1,17 +1,19 @@
 import { readFile } from 'fs/promises';
 import * as AdmZip from 'adm-zip';
-import { System } from '.';
+import { createFS } from '@banez/fs';
+
+const fs = createFS();
 
 export class Zip {
   static async create(config: { location: string }): Promise<Buffer> {
     const zip = new AdmZip();
-    const files = await System.fileTree(config.location, '');
+    const files = await fs.fileTree(config.location, '');
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const fileParts = file.abs.split('/');
+      const fileParts = file.path.abs.split('/');
       const fileName = fileParts[fileParts.length - 1];
-      const fileData = await readFile(file.abs);
-      zip.addFile(file.rel ? `${file.rel}/${fileName}` : fileName, fileData);
+      const fileData = await readFile(file.path.abs);
+      zip.addFile(file.dir ? `${file.dir}/${fileName}` : fileName, fileData);
     }
     return zip.toBuffer();
   }

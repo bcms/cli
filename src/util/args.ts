@@ -198,23 +198,4 @@ export function parseArgs(rawArgs: string[]): Args {
     output[group] = getArg(argData.names, argData.type);
   }
   return output;
-  // return {
-  //   login: getArg(['--login'], 'boolean'),
-  //   logout: getArg(['--logout'], 'boolean'),
-  //   bundle: getArg(['--bundle', '--b'], 'boolean'),
-  //   plugin: getArg(['--plugin', '--pl'], 'boolean'),
-  //   create: getArg(['--create', '--c'], 'boolean'),
-  //   function: getArg(['--function', '--f'], 'string'),
-  //   public: getArg(['--public', '--p'], 'boolean'),
-  //   instance: getArg(['--instance', '--i'], 'string'),
-  //   run: getArg(['--run'], 'boolean'),
-  //   cms: getArg(['--cms'], 'string'),
-  //   deploy: getArg(['--deploy', '--d'], 'string'),
-  //   cloudOrigin: getArg(['--cloud-origin', '--co'], 'string'),
-  //   email: getArg(['--email'], 'string'),
-  //   password: getArg(['--password'], 'string'),
-  //   otp: getArg(['--otp'], 'string'),
-  //   terminalLogin: getArg(['--terminal-login'], 'boolean'),
-  //   install: getArg(['--install']),
-  // };
 }
