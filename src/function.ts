@@ -1,7 +1,11 @@
-import * as path from 'path';
 import { prompt } from 'inquirer';
-import { Args, System } from './util';
+import type { Args } from './util';
 import { FunctionTemplates } from './templates';
+import { createFS } from '@banez/fs';
+
+const fs = createFS({
+  base: process.cwd(),
+});
 
 export class Function {
   static async create(args: Args): Promise<void> {
@@ -35,8 +39,8 @@ export class Function {
       ]);
       args.public = result.public;
     }
-    await System.writeFile(
-      path.join(process.cwd(), `${args.function}.ts`),
+    await fs.save(
+      `${args.function}.ts`,
       FunctionTemplates.create({
         name: (args.function as string)
           .split('-')

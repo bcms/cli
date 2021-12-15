@@ -1,7 +1,13 @@
 import { prompt } from 'inquirer';
 import * as fse from 'fs-extra';
 import * as path from 'path';
-import { Args, createTasks, System } from './util';
+import { Args, createTasks } from './util';
+import { ChildProcess } from '@banez/child_process';
+import { createFS } from '@banez/fs';
+
+const fs = createFS({
+  base: process.cwd(),
+});
 
 export class Plugin {
   static async bundle(_args: Args): Promise<void> {
@@ -17,7 +23,7 @@ export class Plugin {
       {
         title: 'Build Vue app',
         async task() {
-          await System.spawn('npm', ['run', 'build:vue']);
+          await ChildProcess.spawn('npm', ['run', 'build:vue']);
           await fse.move(
             path.join(process.cwd(), 'dist', 'ui', 'index.html'),
             path.join(process.cwd(), 'dist', 'ui', '_index.html'),
@@ -27,16 +33,9 @@ export class Plugin {
       {
         title: 'Inject plugin name',
         async task() {
-          if (
-            await System.exist(
-              path.join(process.cwd(), 'bcms-plugin.config.json'),
-              true,
-            )
-          ) {
+          if (await fs.exist('bcms-plugin.config.json', true)) {
             const pluginConfig: { pluginName: string } = JSON.parse(
-              await System.readFile(
-                path.join(process.cwd(), 'bcms-plugin.config.json'),
-              ),
+              await fs.readString('bcms-plugin.config.json'),
             );
             pluginName = pluginConfig.pluginName
               .toLowerCase()
@@ -65,13 +64,10 @@ export class Plugin {
               .replace(/--/g, '-')
               .replace(/[^a-z0-9---]/g, '');
           }
-          const filePaths = await System.fileTree(
-            path.join(process.cwd(), 'dist', 'ui'),
-            '',
-          );
+          const filePaths = await fs.fileTree(['dist', 'ui'], '');
           for (let i = 0; i < filePaths.length; i++) {
             const filePath = filePaths[i];
-            let file = await System.readFile(filePath.abs);
+            let file = await fs.readString(filePath.path.abs);
             let buffer = '' + file;
             let loop = true;
             while (loop) {
@@ -82,26 +78,23 @@ export class Plugin {
                 buffer = '' + file;
               }
             }
-            await System.writeFile(filePath.abs, file);
+            await fs.save(filePath.path.abs, file);
           }
         },
       },
       {
         title: 'Build backend',
         async task() {
-          await System.spawn('npm', ['run', 'build:backend']);
+          await ChildProcess.spawn('npm', ['run', 'build:backend']);
         },
       },
       {
         title: 'Inject backend paths and plugin name',
         async task() {
-          const filePaths = await System.fileTree(
-            path.join(process.cwd(), 'dist', 'backend'),
-            '',
-          );
+          const filePaths = await fs.fileTree(['dist', 'backend'], '');
           for (let i = 0; i < filePaths.length; i++) {
             const filePath = filePaths[i];
-            let file = await System.readFile(filePath.abs);
+            let file = await fs.readString(filePath.path.abs);
             let buffer = '' + file;
             let loop = true;
             while (loop) {
@@ -112,7 +105,7 @@ export class Plugin {
                 buffer = '' + file;
               }
             }
-            await System.writeFile(filePath.abs, file);
+            await fs.save(filePath.path.abs, file);
           }
         },
       },
@@ -134,23 +127,21 @@ export class Plugin {
       {
         title: 'Copy package.json',
         async task() {
-          packageJson = JSON.parse(
-            await System.readFile(path.join(process.cwd(), 'package.json')),
-          );
+          packageJson = JSON.parse(await fs.readString('package.json'));
           packageJson.name = `@becomes/cms-plugin-${pluginName}`;
           packageJson.devDependencies = undefined;
           packageJson.nodemonConfig = undefined;
           packageJson.scripts = undefined;
-          await System.writeFile(
-            path.join(process.cwd(), 'dist', pluginName, 'package.json'),
-            JSON.stringify(packageJson, null, ''),
+          await fs.save(
+            ['dist', pluginName, 'package.json'],
+            JSON.stringify(packageJson, null, '  '),
           );
         },
       },
       {
         title: 'Pack',
         async task() {
-          await System.spawn('npm', ['pack'], {
+          await ChildProcess.spawn('npm', ['pack'], {
             cwd: path.join(process.cwd(), 'dist', pluginName),
             stdio: 'inherit',
           });

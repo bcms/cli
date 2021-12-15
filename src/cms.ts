@@ -1,20 +1,23 @@
-import { readFile, mkdir } from 'fs/promises';
 import * as FormData from 'form-data';
 import * as path from 'path';
-import * as fse from 'fs-extra';
 import {
   Args,
   createTasks,
   fileReplacer,
   getInstanceId,
   Select,
-  StringUtil,
-  System,
   Zip,
 } from './util';
 import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import { login } from './login';
 import { prompt } from 'inquirer';
+import { ChildProcess } from '@banez/child_process';
+import { createFS } from '@banez/fs';
+import { StringUtility } from '@banez/string-utility';
+
+const fs = createFS({
+  base: process.cwd(),
+});
 
 export class CMS {
   static async bundle(): Promise<void> {
@@ -22,21 +25,19 @@ export class CMS {
       {
         title: 'Remove dist',
         async task() {
-          await fse.remove(path.join(process.cwd(), 'dist'));
+          await fs.deleteDir('dist');
         },
       },
       {
         title: 'Build typescript',
         async task() {
-          await System.spawn('npm', ['run', 'build']);
+          await ChildProcess.spawn('npm', ['run', 'build']);
         },
       },
       {
         title: 'Fix imports',
         async task() {
-          if (
-            await System.exist(path.join(process.cwd(), 'dist', 'functions'))
-          ) {
+          if (await fs.exist(path.join(process.cwd(), 'dist', 'functions'))) {
             await fileReplacer({
               basePath: '../src',
               dirPath: path.join(process.cwd(), 'dist', 'functions'),
@@ -53,10 +54,8 @@ export class CMS {
       {
         title: 'Copy local plugins',
         async task() {
-          const bcmsConfig = await System.readFile(
-            path.join(process.cwd(), 'bcms.config.js'),
-          );
-          const pluginString = StringUtil.textBetween(
+          const bcmsConfig = await fs.readString('bcms.config.js');
+          const pluginString = StringUtility.textBetween(
             bcmsConfig,
             'plugins: [',
             ']',
@@ -79,22 +78,17 @@ export class CMS {
             const pluginList: string[] = [];
             for (let i = 0; i < plugins.length; i++) {
               const pluginName = plugins[i].formatted + '.tgz';
-              if (
-                await System.exist(
-                  path.join(process.cwd(), 'plugins', pluginName),
-                  true,
-                )
-              ) {
+              if (await fs.exist(['plugins', pluginName], true)) {
                 pluginList.push(plugins[i].raw);
-                await fse.copy(
-                  path.join(process.cwd(), 'plugins', pluginName),
-                  path.join(process.cwd(), 'dist', 'plugins', pluginName),
+                await fs.copy(
+                  ['plugins', pluginName],
+                  ['dist', 'plugins', pluginName],
                 );
               }
             }
             if (pluginList.length > 0) {
-              await System.writeFile(
-                path.join(process.cwd(), 'dist', 'plugin-list.json'),
+              await fs.save(
+                ['dist', 'plugin-list.json'],
                 JSON.stringify(pluginList),
               );
             }
@@ -104,13 +98,11 @@ export class CMS {
       {
         title: 'Copy package.json',
         async task() {
-          const packageJson = JSON.parse(
-            await System.readFile(path.join(process.cwd(), 'package.json')),
-          );
+          const packageJson = JSON.parse(await fs.readString('package.json'));
           delete packageJson.scripts;
           delete packageJson.devDependencies;
-          await System.writeFile(
-            path.join(process.cwd(), 'dist', 'custom-package.json'),
+          await fs.save(
+            ['dist', 'custom-package.json'],
             JSON.stringify(packageJson, null, '  '),
           );
         },
@@ -118,17 +110,14 @@ export class CMS {
       {
         title: 'Copy src data',
         async task() {
-          await fse.copy(
-            path.join(process.cwd(), 'src'),
-            path.join(process.cwd(), 'dist', '_src'),
-          );
+          await fs.copy('src', ['dist', '_src']);
         },
       },
       {
         title: 'Zip output',
         async task() {
-          await System.writeFile(
-            path.join(process.cwd(), 'dist', 'bcms.zip'),
+          await fs.save(
+            ['dist', 'bcms.zip'],
             await Zip.create({ location: path.join(process.cwd(), 'dist') }),
           );
         },
@@ -146,13 +135,11 @@ export class CMS {
     if (!(await client.isLoggedIn())) {
       await login({ args, client });
     }
-    if (
-      !(await System.exist(path.join(process.cwd(), 'dist', 'bcms.zip'), true))
-    ) {
+    if (!(await fs.exist(['dist', 'bcms.zip'], true))) {
       await this.bundle();
     }
     const instanceId = await getInstanceId();
-    const zip = await readFile(path.join(process.cwd(), 'dist', 'bcms.zip'));
+    const zip = await fs.read(['dist', 'bcms.zip']);
     const formData = new FormData();
     formData.append('media', zip, 'bcms.zip');
     const instances = await client.instance.getAll();
@@ -204,13 +191,13 @@ export class CMS {
       {
         title: 'Clone base GitHub repository',
         task: async () => {
-          await System.spawn('git', [
+          await ChildProcess.spawn('git', [
             'clone',
             'https://github.com/becomesco/cms',
             repoName,
           ]);
           // TODO: Remove this line when ready for production
-          await System.spawn('git', ['checkout', 'next'], {
+          await ChildProcess.spawn('git', ['checkout', 'next'], {
             stdio: 'inherit',
             cwd: repoPath,
           });
@@ -230,32 +217,32 @@ export class CMS {
             });
             const tmpName = '__ziptmp';
             const tmpPath = path.join(repoPath, tmpName);
-            await mkdir(tmpPath);
+            await fs.mkdir(tmpPath);
             Zip.unzip({ location: tmpPath, buffer });
-            await fse.remove(path.join(repoPath, 'src'));
-            await fse.copy(
+            await fs.deleteDir(path.join(repoPath, 'src'));
+            await fs.copy(
               path.join(repoPath, tmpName, '_src'),
               path.join(repoPath, 'src'),
             );
             const customPackageJson = JSON.parse(
-              await System.readFile(
+              await fs.readString(
                 path.join(repoPath, tmpName, 'custom-package.json'),
               ),
             );
             const packageJson = JSON.parse(
-              await System.readFile(path.join(repoPath, 'package.json')),
+              await fs.readString(path.join(repoPath, 'package.json')),
             );
             for (const depName in customPackageJson.dependencies) {
               packageJson.dependencies[depName] =
                 customPackageJson.dependencies[depName];
             }
-            await System.writeFile(
+            await fs.save(
               path.join(repoPath, 'package.json'),
               JSON.stringify(packageJson, null, '  '),
             );
-            await fse.remove(path.join(repoPath, tmpName));
+            await fs.deleteDir(path.join(repoPath, tmpName));
           }
-          await System.writeFile(
+          await fs.save(
             path.join(repoPath, 'shim.json'),
             JSON.stringify(
               {

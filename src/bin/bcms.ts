@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { mkdir } from 'fs/promises';
-import { homedir } from 'os';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { createStorage } from '@becomes/cms-cloud-client';
@@ -15,7 +13,7 @@ import { CMS } from '../cms';
 import { Function } from '../function';
 import { Instance } from '../instance';
 import { Plugin } from '../plugin';
-import { parseArgs, System } from '../util';
+import { parseArgs } from '../util';
 import { login } from '../login';
 import { logout } from '../logout';
 import {
@@ -27,8 +25,12 @@ import {
 import type { PurpleCheetah } from '@becomes/purple-cheetah/types';
 import { createServerController } from '../server';
 import { Config } from '../config';
+import { createFS } from '@banez/fs';
 
 async function main() {
+  const fs = createFS({
+    base: Config.fsDir,
+  });
   const args = parseArgs(process.argv);
   if (!args.cloudOrigin) {
     args.cloudOrigin = 'https://cloud.thebcms.com';
@@ -46,10 +48,7 @@ async function main() {
     } = {};
 
     async function save() {
-      await System.writeFile(
-        storageFilePath,
-        JSON.stringify(store, null, '  '),
-      );
+      await fs.save(storageFilePath, JSON.stringify(store, null, '  '));
     }
     async function triggerSubs(
       key: string,
@@ -112,13 +111,13 @@ async function main() {
     };
     return self;
   });
-  if (!(await System.exist(path.join(homedir(), '.bcms')))) {
-    await mkdir(path.join(homedir(), '.bcms'));
+  if (!(await fs.exist(Config.fsDir))) {
+    await fs.mkdir(Config.fsDir);
   }
-  if (!(await System.exist(storageFilePath, true))) {
-    await System.writeFile(storageFilePath, '{}');
+  if (!(await fs.exist(storageFilePath, true))) {
+    await fs.save(storageFilePath, '{}');
   }
-  (storage as any).init(JSON.parse(await System.readFile(storageFilePath)));
+  (storage as any).init(JSON.parse(await fs.readString(storageFilePath)));
   const client = createCloudApiClient({
     args,
     storage,
@@ -164,9 +163,7 @@ async function main() {
       await Function.create(args);
     }
   } else if (typeof args.instance === 'string') {
-    if (args.run) {
-      await Instance.run(args);
-    } else if (args.install) {
+    if (args.install) {
       await Instance.install({ args, client });
     }
   }
