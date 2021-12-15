@@ -1,4 +1,5 @@
 const fse = require('fs-extra');
+const path = require('path');
 const { createConfig } = require('@banez/npm-tool');
 
 module.exports = createConfig({
