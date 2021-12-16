@@ -1,4 +1,4 @@
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes } from 'crypto';
 import * as path from 'path';
 import { Args, createTasks, Select } from './util';
 import { prompt } from 'inquirer';
@@ -390,6 +390,9 @@ export class Instance {
     const rootFs = createFS({
       base: Config.fsDir,
     });
+    const homeFs = createFS({
+      base: '/home/bcms',
+    });
     if (!(await client.isLoggedIn())) {
       await login({ args, client });
     }
@@ -414,7 +417,7 @@ export class Instance {
             name: 'yes',
             message: [
               'Docker is not installed on the system.',
-              'Would you like us to try to install it?',
+              'BCMS required Docker to run. We can install it for you.',
             ].join(' '),
           },
         ]);
@@ -664,7 +667,11 @@ export class Instance {
       const result = await prompt<{ code: string }>([
         {
           type: 'input',
-          message: 'Enter a 6 digit code from email: ',
+          message: [
+            'We need to download a license. To do so we need to verify',
+            'your identity. Please enter a 6 digit code from an email',
+            'you just received:',
+          ].join(' '),
           name: 'code',
         },
       ]);
@@ -693,6 +700,90 @@ export class Instance {
      * System setup
      */
     const mainTasks = createTasks([
+      {
+        title: 'Verify BCMS license',
+        async task() {
+          if (
+            license.value.indexOf('---- BEGIN BCMS LICENSE ----') === -1 ||
+            license.value.indexOf('---- END BCMS LICENSE ----') === -1 ||
+            license.value.split('\n').length !== 23
+          ) {
+            throw Error(
+              [
+                `Invalid license format of "${license.fileName}".`,
+                'If you did not change the license file and you obtained it',
+                'via "https://cloud.thebcms.com", please contact the support.',
+              ].join(' '),
+            );
+          }
+        },
+      },
+      {
+        title: 'Create BCMS user',
+        async task() {
+          const exo = {
+            out: '',
+            err: '',
+          };
+          await ChildProcess.advancedExec(['id', '-u', 'bcms'], {
+            onChunk: ChildProcess.onChunkHelper(exo),
+            doNotThrowError: true,
+          }).awaiter;
+          if (exo.err) {
+            if (exo.err.indexOf('no such user') !== -1) {
+              await ChildProcess.spawn('sudo', [
+                'adduser',
+                '--disabled-password',
+                '--gecos',
+                '"BCMS"',
+                'bcms',
+              ]);
+            } else {
+              throw Error(exo.err);
+            }
+          } else if (!exo.out) {
+            throw Error(
+              [
+                'Cannot find/create user "bcms".',
+                'You will need to create it manually.',
+              ].join(' '),
+            );
+          }
+        },
+      },
+      {
+        title: 'Add BCMS user to the Docker group',
+        async task() {
+          await ChildProcess.spawn('sudo', [
+            'usermod',
+            '-aG',
+            'docker',
+            'bcms',
+          ]);
+        },
+      },
+      {
+        title: 'Prepare BCMS users home directory.',
+        async task() {
+          if (!(await homeFs.exist('storage'))) {
+            await homeFs.mkdir('storage');
+            await ChildProcess.spawn('chown', [
+              '-R',
+              'bcms:bcms',
+              '/home/bcms/storage',
+            ]);
+          }
+          if (!(await rootFs.exist('licenses'))) {
+            await homeFs.mkdir('licenses');
+          }
+          await rootFs.save(['licenses', license.fileName], license.value);
+          await ChildProcess.spawn('chown', [
+            '-R',
+            'bcms:bcms',
+            `/home/bcms/licenses`,
+          ]);
+        },
+      },
       {
         title: 'Setup Docker network',
         async task() {
@@ -744,7 +835,7 @@ export class Instance {
         title: 'Setup database',
         async task() {
           let setupDb = true;
-          if (await rootFs.exist([instance._id, 'db-info.json'])) {
+          if (await homeFs.exist(['storage', instance._id, 'db-info.json'])) {
             const { yes } = await prompt<{ yes: boolean }>([
               {
                 message: [
@@ -856,6 +947,9 @@ export class Instance {
               dbInfo.host = info.host;
               dbInfo.port = info.port;
             } else if (dbInfo.type === 'auto') {
+              dbInfo.user = 'u_' + randomBytes(8).toString('hex');
+              dbInfo.pass = 'p_' + randomBytes(16).toString('hex');
+              dbInfo.name = `db_${instance._id}`;
               if (!(await Docker.image.exists('mongo:5-focal'))) {
                 await Docker.image.pull('mongo:5-focal');
               }
@@ -866,42 +960,72 @@ export class Instance {
                 name: '',
                 pass: '',
               };
-              if (!(await Docker.container.exists('bcms-db'))) {
-                rootUser.name = randomBytes(16).toString('hex');
-                rootUser.pass = createHash('sha256')
-                  .update(randomBytes(16).toString('hex') + Date.now())
-                  .digest('hex');
-                await Docker.container.run({
-                  args: {
-                    '--name': ['bcms-db'],
-                    '-d': [],
-                    '--network': ['bcms'],
-                    '-e': [
-                      `MONGO_INITDB_ROOT_USERNAME=${rootUser.name}`,
-                      `MONGO_INITDB_ROOT_PASSWORD=${rootUser.pass}`,
-                    ],
-                    '-v': [
-                      `${path.join(Config.fsDir, instance._id, 'db')}:/data/db`,
-                    ],
-                    'mongo:5-focal': [],
-                  },
-                });
-                await rootFs.save(
-                  'db-root.json',
-                  JSON.stringify(rootUser, null, '  '),
-                );
-                await Docker.container.exec([
-                  'bcms-db',
-                  'bash',
-                  '-c',
-                  `"mongo --eval -u ${rootUser.name} -p ${rootUser.pass} 'db.createUser({user: "${dbInfo.user}", pwd: "${dbInfo.pass}", roles: [{role: "readWrite", db: "db_${instance._id}"}]})' admin"`,
-                ]);
-              } else {
-                await Docker.container.start('bcms-db');
+              if (await Docker.container.exists('bcms-db')) {
+                await Docker.container.stop('bcms-db');
+                await Docker.container.remove('bcms-db');
               }
+              if (await homeFs.exist(['storage', 'db-root.json'], true)) {
+                const user = JSON.parse(
+                  await homeFs.readString(['storage', 'db-root.json']),
+                );
+                rootUser.name = user.name;
+                rootUser.pass = user.pass;
+              } else {
+                rootUser.name = 'u_' + randomBytes(8).toString('hex');
+                rootUser.pass = 'p_' + randomBytes(16).toString('hex');
+              }
+              if (!(await rootFs.exist('mongodb'))) {
+                await rootFs.mkdir('mongodb');
+              }
+              // await rootFs.save(
+              //   ['mongodb', 'setup.sh'],
+              //   `mongo -u ${rootUser.name} -p ${rootUser.pass} --eval 'db.createUser({user: "${dbInfo.user}", pwd: "${dbInfo.pass}", roles: [{role: "readWrite", db: "db_${instance._id}"}]})' admin`,
+              // );
+              await Docker.container.run({
+                args: {
+                  '--name': ['bcms-db'],
+                  '-d': [],
+                  '--network': ['bcms'],
+                  '-e': [
+                    `MONGO_INITDB_ROOT_USERNAME=${rootUser.name}`,
+                    `MONGO_INITDB_ROOT_PASSWORD=${rootUser.pass}`,
+                  ],
+                  '-v': [`${path.join(Config.fsDir, 'mongodb')}:/data/db`],
+                  'mongo:5-focal': [],
+                },
+              });
+              await homeFs.save(
+                ['storage', 'db-root.json'],
+                JSON.stringify(rootUser, null, '  '),
+              );
+              // const cmd = [
+              //   'docker',
+              //   'exec',
+              //   'bcms-db',
+              //   'bash',
+              //   '-c',
+              //   `"sh /data/db/setup.sh"`,
+              // ];
+              // const exo: ChildProcessOnChunkHelperOutput = {
+              //   err: '',
+              //   out: '',
+              // };
+              // await ChildProcess.advancedExec(cmd, {
+              //   onChunk: ChildProcess.onChunkHelper(exo),
+              //   doNotThrowError: true,
+              // }).awaiter;
+              // if (exo.err) {
+              //   console.error('ERROR ........................................');
+              //   console.error(exo.err);
+              //   throw Error();
+              // } else {
+              //   console.log('OUTPUT ........................');
+              //   console.log(exo.out);
+              // }
+              // await rootFs.deleteFile(['mongodb', 'setup.sh']);
             }
-            await rootFs.save(
-              [instance._id, 'db-info.json'],
+            await homeFs.save(
+              ['storage', instance._id, 'db-info.json'],
               JSON.stringify(dbInfo, null, '  '),
             );
             await ChildProcess.spawn('chown', [
@@ -910,98 +1034,6 @@ export class Instance {
               path.join(Config.fsDir, instance._id, 'db-info.json'),
             ]);
           }
-        },
-      },
-      {
-        title: 'Verify BCMS license',
-        async task() {
-          if (
-            license.value.indexOf('---- BEGIN BCMS LICENSE ----') === -1 ||
-            license.value.indexOf('---- END BCMS LICENSE ----') === -1 ||
-            license.value.split('\n').length !== 24
-          ) {
-            throw Error(
-              [
-                `Invalid license format of "${license.fileName}".`,
-                'If you did not change the license file and you obtained it',
-                'via "https://cloud.thebcms.com", please contact the support.',
-              ].join(' '),
-            );
-          }
-        },
-      },
-      {
-        title: 'Create BCMS user',
-        async task() {
-          const exo = {
-            out: '',
-            err: '',
-          };
-          await ChildProcess.advancedExec(['id', '-u', 'bcms'], {
-            onChunk: ChildProcess.onChunkHelper(exo),
-            doNotThrowError: true,
-          }).awaiter;
-          if (exo.err) {
-            if (exo.err.indexOf('no such user') !== -1) {
-              await ChildProcess.spawn('sudo', [
-                'adduser',
-                '--disabled-password',
-                '--gecos',
-                '"BCMS"',
-                'bcms',
-              ]);
-            } else {
-              throw Error(exo.err);
-            }
-          } else if (!exo.out) {
-            throw Error(
-              [
-                'Cannot find/create user "bcms".',
-                'You will need to create it manually.',
-              ].join(' '),
-            );
-          }
-        },
-      },
-      {
-        title: 'Add BCMS user to the Docker group',
-        async task() {
-          await ChildProcess.spawn('sudo', [
-            'usermod',
-            '-aG',
-            'docker',
-            'bcms',
-          ]);
-        },
-      },
-      {
-        title: 'Prepare BCMS users home directory.',
-        async task() {
-          if (!(await rootFs.exist('/home/bcms/storage'))) {
-            await ChildProcess.spawn('mkdir', ['/home/bcms/storage']);
-            await ChildProcess.spawn('chown', [
-              '-R',
-              'bcms:bcms',
-              '/home/bcms/storage',
-            ]);
-          }
-          if (!(await rootFs.exist('/home/bcms/licenses'))) {
-            await ChildProcess.spawn('mkdir', ['/home/bcms/licenses']);
-            await ChildProcess.spawn('chown', [
-              '-R',
-              'bcms:bcms',
-              '/home/bcms/licenses',
-            ]);
-          }
-          await rootFs.save(
-            `/home/bcms/licenses/${license.fileName}`,
-            license.value,
-          );
-          await ChildProcess.spawn('chown', [
-            '-R',
-            'bcms:bcms',
-            `/home/bcms/licenses/${license.fileName}`,
-          ]);
         },
       },
       {
@@ -1041,6 +1073,8 @@ export class Instance {
               '-e',
               'BCMS_MANAGE=true',
               '--name',
+              'bcms-shim',
+              '--hostname',
               'bcms-shim',
               'becomes/cms-shim',
               '&&',
