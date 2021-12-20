@@ -1045,11 +1045,23 @@ export class Instance {
       {
         title: 'Run BCMS Shim container',
         async task() {
+          if (await Docker.container.exists('bcms-shim')) {
+            await Docker.container.stop('bcms-shim', {
+              doNotThrowError: true,
+              onChunk: (type, chunk) => {
+                process[type].write(chunk);
+              },
+            });
+            await Docker.container.remove('bcms-shim', {
+              doNotThrowError: true,
+              onChunk: (type, chunk) => {
+                process[type].write(chunk);
+              },
+            });
+          }
           await ChildProcess.advancedExec(
             [
               'cd /home/bcms',
-              '&&',
-              'su bcms -y',
               '&&',
               'ls -l',
               '&&',
