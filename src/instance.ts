@@ -1079,9 +1079,21 @@ export class Instance {
               '-e',
               'PORT=1279',
               '-e',
-              'BCMS_CLOUD_DOMAIN=cloud.thebcms.com',
+              `BCMS_CLOUD_DOMAIN=${
+                args.cloudOrigin
+                  ? args.cloudOrigin
+                      .replace('https://', '')
+                      .replace('http://', '')
+                  : 'cloud.thebcms.com'
+              }`,
               '-e',
-              'BCMS_CLOUD_PORT=443',
+              `BCMS_CLOUD_PORT=${
+                args.cloudOrigin
+                  ? args.cloudOrigin.startsWith('https')
+                    ? '443'
+                    : '80'
+                  : '443'
+              }`,
               '-e',
               'BCMS_MANAGE=true',
               '--name',
