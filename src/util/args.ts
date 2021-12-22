@@ -16,6 +16,9 @@ export interface Args {
   otp?: string;
   terminalLogin?: boolean;
   install?: boolean;
+  shim?: boolean;
+  version?: string;
+  update?: boolean;
 }
 
 export function parseArgs(rawArgs: string[]): Args {
@@ -112,6 +115,15 @@ export function parseArgs(rawArgs: string[]): Args {
     install: {
       type: 'boolean',
     },
+    shim: {
+      type: 'boolean',
+    },
+    version: {
+      type: 'string',
+    },
+    update: {
+      type: 'boolean',
+    },
   };
   const groups: {
     [name: string]: {
@@ -171,6 +183,13 @@ export function parseArgs(rawArgs: string[]): Args {
     '--terminal-login': groups.terminalLogin.name,
 
     '--install': groups.install.name,
+
+    '--shim': groups.shim.name,
+
+    '--version': groups.version.name,
+    '--v': groups.version.name,
+
+    '--update': groups.update.name,
   };
   const output: {
     [name: string]: string | boolean | undefined;
