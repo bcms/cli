@@ -26,10 +26,18 @@ import type { PurpleCheetah } from '@becomes/purple-cheetah/types';
 import { createServerController } from '../server';
 import { Config } from '../config';
 import { createFS } from '@banez/fs';
+import { Migration } from '../migration';
+import { MigrationConfig, MigrationConfigSchema } from '../types';
+import { ObjectUtility } from '@banez/object-utility';
+import { ObjectUtilityError } from '@banez/object-utility/types';
+import { createTerminalTitle, Terminal } from '../terminal';
 
 async function main() {
   const fs = createFS({
     base: Config.fsDir,
+  });
+  const rootFs = createFS({
+    base: process.cwd(),
   });
   const args = parseArgs(process.argv);
   if (!args.cloudOrigin) {
@@ -165,6 +173,61 @@ async function main() {
   } else if (typeof args.instance === 'string') {
     if (args.install) {
       await Instance.install({ args, client });
+    }
+  } else if (args.migration) {
+    let migrationConfig: MigrationConfig = {} as never;
+
+    if (await rootFs.exist('bcms.migration.json', true)) {
+      migrationConfig = JSON.parse(
+        await rootFs.readString('bcms.migration.json'),
+      );
+      const result = ObjectUtility.compareWithSchema(
+        migrationConfig,
+        MigrationConfigSchema,
+        'migrationConfig',
+      );
+      if (result instanceof ObjectUtilityError) {
+        throw Error(result.message);
+      }
+    } else {
+      migrationConfig = {
+        database: {
+          from: {
+            collectionPrefix: args.collectionPrfx || 'bcms',
+            url: args.dbUrl || '',
+          },
+          to: {
+            collectionPrefix: args.toCollectionPrfx || 'bcms',
+            url: args.toDBUrl || '',
+          },
+        },
+      };
+    }
+
+    if (args.version === '2') {
+      if (args.migration === 'pull') {
+        Terminal.pushComponent({
+          name: 'title',
+          component: createTerminalTitle({
+            state: {
+              text: 'Migration V2 - Pull',
+            },
+          }),
+        });
+        Terminal.render();
+        await Migration.pull.v2({ args, migrationConfig });
+      } else if (args.migration === 'transform') {
+        Terminal.pushComponent({
+          name: 'title',
+          component: createTerminalTitle({
+            state: {
+              text: 'Migration V2 - Transform V2 to V3 database',
+            },
+          }),
+        });
+        Terminal.render();
+        await Migration.transform.v2({ args, migrationConfig });
+      }
     }
   }
   setTimeout(() => {

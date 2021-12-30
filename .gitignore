@@ -13,6 +13,8 @@
 /local-dev-dist
 /public
 /src/util/_bcms_security.json
+/migration
+/bcms.migration.json
 
 # Logs
 /log

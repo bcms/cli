@@ -19,6 +19,11 @@ export interface Args {
   shim?: boolean;
   version?: string;
   update?: boolean;
+  migration?: string;
+  collectionPrfx?: string;
+  toCollectionPrfx?: string;
+  dbUrl?: string;
+  toDBUrl?: string;
 }
 
 export function parseArgs(rawArgs: string[]): Args {
@@ -124,6 +129,21 @@ export function parseArgs(rawArgs: string[]): Args {
     update: {
       type: 'boolean',
     },
+    migration: {
+      type: 'string',
+    },
+    collectionPrfx: {
+      type: 'string',
+    },
+    toCollectionPrfx: {
+      type: 'string',
+    },
+    dbUrl: {
+      type: 'string',
+    },
+    toDBUrl: {
+      type: 'string',
+    },
   };
   const groups: {
     [name: string]: {
@@ -190,6 +210,18 @@ export function parseArgs(rawArgs: string[]): Args {
     '--v': groups.version.name,
 
     '--update': groups.update.name,
+
+    '--migration': groups.migration.name,
+    '--mig': groups.migration.name,
+
+    '--collection-prefix': groups.collectionPrfx.name,
+    '--col-prfx': groups.collectionPrfx.name,
+
+    '--to-collection-prefix': groups.toCollectionPrfx.name,
+    '--to-col-prfx': groups.toCollectionPrfx.name,
+
+    '--db-url': groups.dbUrl.name,
+    '--to-db-url': groups.toDBUrl.name,
   };
   const output: {
     [name: string]: string | boolean | undefined;

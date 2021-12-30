@@ -5,3 +5,5 @@ tools.js
 /npm-tool.js
 dev.js
 bcms.config.js
+/migration
+/bcms-client-v2

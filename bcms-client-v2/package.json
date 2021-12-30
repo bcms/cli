@@ -1,0 +1,22 @@
+{
+  "name": "@becomes/cms-client",
+  "version": "2.0.6",
+  "description": "Utility for Becomes CMS used for client side implementation.",
+  "author": "becomes.co",
+  "license": "MIT",
+  "main": "index.js",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "crypto-js": "^4.0.0",
+    "socket.io-client": "^4.0.1",
+    "uuid": "^8.3.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/becomesco/cms-client.git"
+  },
+  "bugs": {
+    "url": "https://github.com/becomesco/cms-client/issues"
+  },
+  "homepage": "https://github.com/becomesco/cms-client#readme"
+}
