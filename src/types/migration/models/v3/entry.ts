@@ -13,9 +13,14 @@ export interface EntryV3ContentNode {
   attrs?:
     | EntryV3ContentNodeHeadingAttr
     | PropV3ValueWidgetData
-    | EntryV3ContentNodeLinkAttr;
+    | EntryV3ContentNodeLinkAttr
+    | EntryV3ContentNodeCodeBlockAttr;
   marks?: EntryV3ContentNodeMarker[];
   text?: string;
+}
+
+export interface EntryV3ContentNodeCodeBlockAttr {
+  language: string | null;
 }
 
 export interface EntryV3ContentNodeHeadingAttr {

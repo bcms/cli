@@ -1,6 +1,7 @@
 export * from './args';
 export * from './docker';
 export * from './file-replacer';
+export * from './get-cms-info';
 export * from './instance-id';
 export * from './select';
 export * from './tasks';

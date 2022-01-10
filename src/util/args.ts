@@ -24,6 +24,9 @@ export interface Args {
   toCollectionPrfx?: string;
   dbUrl?: string;
   toDBUrl?: string;
+  cmsClientOrigin?: string;
+  cmsClientApiKey?: string;
+  cmsClientApiSecret?: string;
 }
 
 export function parseArgs(rawArgs: string[]): Args {
@@ -144,6 +147,15 @@ export function parseArgs(rawArgs: string[]): Args {
     toDBUrl: {
       type: 'string',
     },
+    cmsClientOrigin: {
+      type: 'string',
+    },
+    cmsClientApiKey: {
+      type: 'string',
+    },
+    cmsClientApiSecret: {
+      type: 'string',
+    },
   };
   const groups: {
     [name: string]: {
@@ -222,6 +234,15 @@ export function parseArgs(rawArgs: string[]): Args {
 
     '--db-url': groups.dbUrl.name,
     '--to-db-url': groups.toDBUrl.name,
+
+    '--cms-client-origin': groups.cmsClientOrigin.name,
+    '--cco': groups.cmsClientOrigin.name,
+
+    '--cms-client-api-key': groups.cmsClientApiKey.name,
+    '--ccak': groups.cmsClientApiKey.name,
+
+    '--cms-client-api-secret': groups.cmsClientApiSecret.name,
+    '--ccas': groups.cmsClientApiSecret.name,
   };
   const output: {
     [name: string]: string | boolean | undefined;

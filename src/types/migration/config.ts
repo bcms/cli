@@ -70,7 +70,7 @@ export const MigrationConfigSchema: ObjectSchema = {
             __required: false,
           },
           api: {
-            __type: 'string',
+            __type: 'object',
             __required: false,
             __child: {
               id: {

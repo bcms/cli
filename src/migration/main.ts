@@ -1,25 +1,37 @@
 import * as path from 'path';
+import { BCMSClient as BCMSClientV2 } from '../../bcms-client-v2';
 import { v4 as uuidv4 } from 'uuid';
 import { createFS } from '@banez/fs';
 import { ChildProcess } from '@banez/child_process';
-import type { Args } from '../util';
+import { Args, getCmsInfo } from '../util';
 import type { ChildProcessOnChunkHelperOutput } from '@banez/child_process/types';
-import {prompt} from 'inquirer'
+import { prompt } from 'inquirer';
 import {
   ApiKeyV2,
   ApiKeyV3,
+  EntryV2,
+  EntryV3,
+  EntryV3Content,
+  EntryV3ContentNode,
+  EntryV3ContentNodeMarker,
+  EntryV3ContentNodeMarkerType,
+  EntryV3ContentNodeType,
+  EntryV3Meta,
   GroupV2,
   GroupV3,
   IdCounterV3,
   LanguageV2,
   LanguageV3,
   MediaV2,
+  MediaV2Type,
   MediaV3,
   MigrationConfig,
   PropV2,
   PropV2EntryPointer,
   PropV2Enum,
   PropV2GroupPointer,
+  PropV2Quill,
+  PropV2QuillOption,
   PropV2Type,
   PropV3,
   PropV3EntryPointerData,
@@ -27,6 +39,9 @@ import {
   PropV3GroupPointerData,
   PropV3MediaData,
   PropV3Type,
+  PropV3Value,
+  PropV3ValueGroupPointerData,
+  PropV3ValueWidgetData,
   TemplateV2,
   TemplateV3,
   WidgetV2,
@@ -38,6 +53,53 @@ import {
   createTerminalList,
   createTerminalTitle,
 } from '../terminal';
+
+function nodeToText({ node }: { node: EntryV3ContentNode }) {
+  let output = '';
+  if (node.type === 'widget') {
+    const attrs = node.attrs as PropV3ValueWidgetData;
+    output += '__widget' + JSON.stringify(attrs);
+  } else {
+    if (node.type === EntryV3ContentNodeType.text && node.text) {
+      output += node.text;
+    } else if (node.type === EntryV3ContentNodeType.paragraph && node.content) {
+      output += `${node.content
+        .map((childNode) => nodeToText({ node: childNode }))
+        .join('')}\n`;
+    } else if (
+      node.type === EntryV3ContentNodeType.heading &&
+      node.attrs &&
+      node.content
+    ) {
+      output += `${node.content
+        .map((childNode) => nodeToText({ node: childNode }))
+        .join('')}`;
+    } else if (
+      node.type === EntryV3ContentNodeType.bulletList &&
+      node.content
+    ) {
+      output += `${node.content
+        .map((childNode) => nodeToText({ node: childNode }))
+        .join('')}`;
+    } else if (node.type === EntryV3ContentNodeType.listItem && node.content) {
+      output += `${node.content
+        .map((childNode) => nodeToText({ node: childNode }))
+        .join('')}`;
+    } else if (
+      node.type === EntryV3ContentNodeType.orderedList &&
+      node.content
+    ) {
+      output += `${node.content
+        .map((childNode) => nodeToText({ node: childNode }))
+        .join('')}`;
+    } else if (node.type === EntryV3ContentNodeType.codeBlock && node.content) {
+      output += `${node.content
+        .map((childNode) => nodeToText({ node: childNode }))
+        .join('')}`;
+    }
+  }
+  return output;
+}
 
 export class Migration {
   private static basePath = path.join(process.cwd(), 'migration');
@@ -136,8 +198,14 @@ export class Migration {
         } else {
           const pathParts = inputMedia.path.split('/').slice(1);
           if (pathParts.length > 0) {
-            const parentName = pathParts[pathParts.length - 1];
-            const parentMedia = v2Media.find((e) => e.name === parentName);
+            let parentMedia: MediaV2 | undefined = undefined;
+            if (inputMedia.type === MediaV2Type.DIR) {
+              const parentName = pathParts[pathParts.length - 2];
+              parentMedia = v2Media.find((e) => e.name === parentName);
+            } else {
+              const parentName = pathParts[pathParts.length - 1];
+              parentMedia = v2Media.find((e) => e.name === parentName);
+            }
             if (parentMedia) {
               output.parentId = parentMedia._id.$oid;
             } else {
@@ -153,6 +221,11 @@ export class Migration {
   }
   static get props(): {
     v2(data: { inputProps: PropV2[]; v2Media: MediaV2[] }): PropV3[];
+    v2Values(data: {
+      prfx: string;
+      inputProps: PropV2[];
+      schemaProps: PropV3[];
+    }): Promise<PropV3Value[]>;
   } {
     return {
       v2({ inputProps, v2Media }) {
@@ -219,6 +292,358 @@ export class Migration {
           output.push(outputProp);
         }
         return output;
+      },
+      async v2Values({ inputProps, schemaProps, prfx }) {
+        const outputFs = createFS({
+          base: path.join(Migration.basePath, 'v3_data'),
+        });
+        const outputProps: PropV3Value[] = [];
+        for (let i = 0; i < schemaProps.length; i++) {
+          const schemaProp = schemaProps[i];
+          const inputProp = inputProps.find((e) => e.name === schemaProp.name);
+          if (inputProp) {
+            let pushProp = true;
+            const outputProp: PropV3Value = {
+              id: schemaProp.id,
+              data: [],
+            };
+            if (
+              inputProp.type === PropV2Type.STRING ||
+              inputProp.type === PropV2Type.NUMBER ||
+              inputProp.type === PropV2Type.BOOLEAN ||
+              inputProp.type === PropV2Type.DATE
+            ) {
+              outputProp.data = inputProp.value as string[];
+            } else if (inputProp.type === PropV2Type.ENTRY_POINTER) {
+              const inputValue = inputProp.value as PropV2EntryPointer;
+              outputProp.data = inputValue.entryIds;
+            } else if (inputProp.type === PropV2Type.ENUMERATION) {
+              const inputValue = inputProp.value as PropV2Enum;
+              outputProp.data = [inputValue.selected || ''];
+            } else if (inputProp.type === PropV2Type.GROUP_POINTER) {
+              const inputValue = inputProp.value as PropV2GroupPointer;
+              const groups: GroupV3[] = JSON.parse(
+                await outputFs.readString(`${prfx}_groups.json`),
+              );
+              const group = groups.find((e) => e._id === inputValue._id);
+              if (group) {
+                const outputData: PropV3ValueGroupPointerData = {
+                  _id: inputValue._id,
+                  items: [],
+                };
+                for (let j = 0; j < inputValue.items.length; j++) {
+                  const inputItem = inputValue.items[j];
+                  outputData.items.push({
+                    props: await Migration.props.v2Values({
+                      prfx,
+                      inputProps: inputItem.props,
+                      schemaProps: group.props,
+                    }),
+                  });
+                }
+                outputProp.data = outputData;
+              } else {
+                pushProp = false;
+              }
+            } else if (inputProp.type === PropV2Type.MEDIA) {
+              const inputValue = inputProp.value as string[];
+              const allMedia: MediaV2[] = JSON.parse(
+                await Migration.fs.readString([
+                  'v2_data',
+                  `${prfx}_medias.json`,
+                ]),
+              );
+              const outputData: string[] = [];
+              for (let j = 0; j < inputValue.length; j++) {
+                const mediaPath = inputValue[j];
+                const media = allMedia.find(
+                  (e) =>
+                    `${!e.isInRoot ? `${e.path}/` : ''}${e.name}` === mediaPath,
+                );
+                if (media) {
+                  outputData.push(media._id.$oid);
+                }
+              }
+              outputProp.data = outputData;
+            } else {
+              pushProp = false;
+            }
+            if (pushProp) {
+              outputProps.push(outputProp);
+            }
+          }
+        }
+        return outputProps;
+      },
+    };
+  }
+  static get content(): {
+    v2(data: {
+      inputProps: PropV2[];
+      prfx: string;
+      lng: string;
+    }): Promise<EntryV3ContentNode[]>;
+    v2OpsToNode(data: {
+      ops: PropV2QuillOption[];
+      nodeType: EntryV3ContentNodeType;
+    }): EntryV3ContentNode;
+    v2OpAttrsToMarks(data: {
+      attrs: {
+        bold?: boolean;
+        italic?: boolean;
+        underline?: boolean;
+        strike?: boolean;
+        list?: string;
+        indent?: number;
+        link?: string;
+        header?: number;
+      };
+    }): EntryV3ContentNodeMarker[];
+    v2ResolveList(data: {
+      ops: PropV2QuillOption[];
+      depth: number;
+    }): EntryV3ContentNode;
+  } {
+    return {
+      async v2({ inputProps }) {
+        const output: EntryV3ContentNode[] = [];
+        for (let i = 0; i < inputProps.length; i++) {
+          const inputProp = inputProps[i];
+          const inputValue = inputProp.value as PropV2Quill;
+          if (inputProp.type.startsWith('HEADING_')) {
+            const node: EntryV3ContentNode = {
+              type: EntryV3ContentNodeType.heading,
+              attrs: {
+                level: parseInt(inputProp.type.replace('HEADING_', ''), 10),
+              },
+              content: [
+                {
+                  type: EntryV3ContentNodeType.text,
+                  text: inputValue.ops
+                    .map((e) => e.insert.replace(/\n/g, ''))
+                    .join(' '),
+                },
+              ],
+            };
+            output.push(node);
+          } else if (inputProp.type === PropV2Type.PARAGRAPH) {
+            output.push(
+              Migration.content.v2OpsToNode({
+                ops: inputValue.ops,
+                nodeType: EntryV3ContentNodeType.paragraph,
+              }),
+            );
+          } else if (inputProp.type === PropV2Type.LIST) {
+            const ops: PropV2QuillOption[] = [];
+            for (let j = 1; j < inputValue.ops.length; j += 2) {
+              const op = inputValue.ops[j];
+              op.insert += inputValue.ops[j - 1].insert;
+              if (!op.attributes || !op.attributes.indent) {
+                op.attributes = {
+                  indent: 0,
+                  list: 'bullet',
+                };
+              }
+              ops.push(op);
+            }
+            output.push(
+              Migration.content.v2ResolveList({
+                ops,
+                depth: 0,
+              }),
+            );
+          } else if (inputProp.type === PropV2Type.CODE) {
+            output.push(
+              Migration.content.v2OpsToNode({
+                ops: inputValue.ops,
+                nodeType: EntryV3ContentNodeType.codeBlock,
+              }),
+            );
+          }
+        }
+        return output;
+      },
+      v2ResolveList({ ops, depth }) {
+        const node: EntryV3ContentNode = {
+          type: EntryV3ContentNodeType.bulletList,
+          content: [],
+        };
+        const nodeContent: EntryV3ContentNode[] = [];
+        let i = 0;
+        while (i < ops.length) {
+          const op = ops[i];
+          if (op.attributes && typeof op.attributes.indent === 'number') {
+            if (op.attributes.indent === depth) {
+              nodeContent.push({
+                type: EntryV3ContentNodeType.listItem,
+                content: [
+                  {
+                    type: EntryV3ContentNodeType.paragraph,
+                    content: [
+                      {
+                        type: EntryV3ContentNodeType.text,
+                        marks: op.attributes
+                          ? Migration.content.v2OpAttrsToMarks({
+                              attrs: op.attributes,
+                            })
+                          : undefined,
+                        text: op.insert.replace(/\n/g, ''),
+                      },
+                    ],
+                  },
+                ],
+              });
+              i++;
+            } else if (op.attributes.indent > depth) {
+              let subScopeTo = i;
+              const newDepth = op.attributes.indent;
+              let found = false;
+              for (let j = i; j < ops.length; j++) {
+                const subOp = ops[j];
+                if (
+                  subOp.attributes &&
+                  subOp.attributes.indent &&
+                  subOp.attributes.indent < newDepth
+                ) {
+                  subScopeTo = j;
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                subScopeTo = ops.length;
+              }
+              const subListOps = ops.slice(i, subScopeTo);
+              (
+                nodeContent[nodeContent.length - 1]
+                  .content as EntryV3ContentNode[]
+              ).push(
+                Migration.content.v2ResolveList({
+                  ops: subListOps,
+                  depth: newDepth,
+                }),
+              );
+              if (subScopeTo === i) {
+                i++;
+              } else {
+                i = subScopeTo;
+              }
+            } else {
+              i++;
+            }
+          } else {
+            i++;
+          }
+        }
+        node.content = nodeContent;
+        return node;
+      },
+      v2OpAttrsToMarks({ attrs }) {
+        const marks: EntryV3ContentNodeMarker[] = [];
+        if (attrs.bold) {
+          marks.push({
+            type: EntryV3ContentNodeMarkerType.bold,
+          });
+        }
+        if (attrs.italic) {
+          marks.push({
+            type: EntryV3ContentNodeMarkerType.italic,
+          });
+        }
+        if (attrs.underline) {
+          marks.push({
+            type: EntryV3ContentNodeMarkerType.underline,
+          });
+        }
+        if (attrs.strike) {
+          marks.push({
+            type: EntryV3ContentNodeMarkerType.strike,
+          });
+        }
+        if (attrs.link) {
+          marks.push({
+            type: EntryV3ContentNodeMarkerType.link,
+            attrs: {
+              href: attrs.link,
+              target: '_blank',
+            },
+          });
+        }
+        return marks;
+      },
+      v2OpsToNode({ ops, nodeType }) {
+        const node: EntryV3ContentNode = {
+          type: nodeType,
+          content: [],
+        };
+        const nodeContent: EntryV3ContentNode[] = [];
+        let inList = false;
+        let skipPush = false;
+        const listOps: PropV2QuillOption[] = [];
+        for (let i = 0; i < ops.length; i++) {
+          const op = ops[i];
+          const type: EntryV3ContentNodeType = EntryV3ContentNodeType.text;
+
+          if (op.attributes) {
+            if (op.attributes.list) {
+              inList = true;
+              if (ops[i + 2]) {
+                const nextListItem = ops[i + 2];
+                if (nextListItem.attributes && nextListItem.attributes.list) {
+                  op.insert += ops[i - 1].insert;
+                  op.attributes = op.attributes ? op.attributes : {};
+                  if (ops[i - 1].attributes) {
+                    op.attributes = {
+                      ...op.attributes,
+                      ...ops[i - 1].attributes,
+                    };
+                  }
+                  if (!op.attributes.indent) {
+                    op.attributes.indent = 0;
+                  }
+                  i++;
+                }
+                listOps.push(op);
+              }
+            }
+
+            if (!inList && !skipPush) {
+              nodeContent.push({
+                type,
+                text: op.insert,
+                attrs:
+                  nodeType === EntryV3ContentNodeType.codeBlock
+                    ? {
+                        language: null,
+                      }
+                    : undefined,
+                marks: op.attributes
+                  ? Migration.content.v2OpAttrsToMarks({ attrs: op.attributes })
+                  : undefined,
+              });
+            } else if (skipPush) {
+              skipPush = false;
+            }
+          } else {
+            if (inList) {
+              inList = false;
+              skipPush = true;
+              nodeContent.push(
+                Migration.content.v2ResolveList({
+                  ops: listOps,
+                  depth: 0,
+                }),
+              );
+            } else {
+              nodeContent.push({
+                type: EntryV3ContentNodeType.text,
+                text: op.insert,
+              });
+            }
+          }
+        }
+        node.content = nodeContent;
+        return node;
       },
     };
   }
@@ -318,19 +743,19 @@ export class Migration {
             maker: '♺',
           };
         }
-        function updateTerminalList() {
-          terminalList.update({
-            state: {
-              items: Object.keys(terminalListItems).map((name) => {
-                const item = terminalListItems[name];
-                return {
-                  text: item.name + ' ' + item.maker,
-                };
-              }),
-            },
-          });
-          Terminal.render();
-        }
+        // function updateTerminalList() {
+        //   terminalList.update({
+        //     state: {
+        //       items: Object.keys(terminalListItems).map((name) => {
+        //         const item = terminalListItems[name];
+        //         return {
+        //           text: item.name + ' ' + item.maker,
+        //         };
+        //       }),
+        //     },
+        //   });
+        //   Terminal.render();
+        // }
         function updateProgress(
           progressName: string,
           itemsLength: number,
@@ -384,10 +809,15 @@ export class Migration {
         for (let i = 0; i < Migration.collectionNames.v2.length; i++) {
           const cName = Migration.collectionNames.v2[i];
           let dbData = [];
+          console.log(`${fromPrfx}${cName}.json`);
           if (await inputFs.exist(`${fromPrfx}${cName}.json`, true)) {
-            dbData = JSON.parse(
-              await inputFs.readString(`${fromPrfx}${cName}.json`),
-            );
+            try {
+              dbData = JSON.parse(
+                await inputFs.readString(`${fromPrfx}${cName}.json`),
+              );
+            } catch (error) {
+              dbData = [];
+            }
           }
           const progress = 0;
           const progressName = `[${i + 1}/${
@@ -572,9 +1002,74 @@ export class Migration {
                 );
               }
               break;
+            case '_entries':
+              {
+                const items = dbData as EntryV2[];
+                const output: EntryV3[] = [];
+                idc.entries.count = items.length;
+
+                for (let j = 0; j < items.length; j++) {
+                  const item = items[j];
+                  const templates: TemplateV3[] = JSON.parse(
+                    await outputFs.readString([`${toPrfx}_templates.json`]),
+                  );
+                  const template = templates.find(
+                    (e) => e._id === item.templateId,
+                  );
+                  if (template) {
+                    const newMeta: EntryV3Meta[] = [];
+                    for (let k = 0; k < item.meta.length; k++) {
+                      const meta = item.meta[k];
+                      newMeta.push({
+                        lng: meta.lng,
+                        props: await Migration.props.v2Values({
+                          inputProps: meta.props,
+                          prfx: toPrfx,
+                          schemaProps: template.props,
+                        }),
+                      });
+                    }
+                    const newContent: EntryV3Content[] = [];
+                    for (let k = 0; k < item.content.length; k++) {
+                      const content = item.content[k];
+                      const nodes = await Migration.content.v2({
+                        inputProps: content.props,
+                        lng: content.lng,
+                        prfx: toPrfx,
+                      });
+                      newContent.push({
+                        lng: content.lng,
+                        nodes,
+                        plainText: nodes
+                          .map((node) => nodeToText({ node }))
+                          .join('\n'),
+                      });
+                    }
+                    output.push({
+                      _id: item._id.$oid,
+                      createdAt: item.createdAt,
+                      updatedAt: item.updatedAt,
+                      cid: (j + 1).toString(16),
+                      templateId: item.templateId,
+                      userId: item.userId,
+                      status: item.status,
+                      meta: newMeta,
+                      content: newContent,
+                      __v: 0,
+                    });
+                  }
+                  // updateProgress(progressName, items.length, j);
+                }
+
+                await outputFs.save(
+                  `${toPrfx}${Migration.collectionNames.v2v3Map[cName]}.json`,
+                  JSON.stringify(output, null, '  '),
+                );
+              }
+              break;
           }
           terminalListItems[cName].maker = '✓';
-          updateTerminalList();
+          // updateTerminalList();
         }
         await outputFs.save(
           `${toPrfx}_id_counters.json`,
@@ -597,13 +1092,14 @@ export class Migration {
   } {
     return {
       async v2({ args, migrationConfig }) {
+        const titleComponent = createTerminalTitle({
+          state: {
+            text: 'Migration V2 - Pulling data',
+          },
+        });
         Terminal.pushComponent({
           name: 'title',
-          component: createTerminalTitle({
-            state: {
-              text: 'Migration V2 - Pulling data',
-            },
-          }),
+          component: titleComponent,
         });
         const [prfx] = Migration.getPrefix({ args, migrationConfig });
         const url = args.dbUrl
@@ -659,12 +1155,87 @@ export class Migration {
           ]);
         }
 
-        const pullMedia = (await prompt<{yes: boolean}>([
-          {
-            name: 'yes',
-            message: ''
+        const pullMedia = (
+          await prompt<{ yes: boolean }>([
+            {
+              name: 'yes',
+              message: 'Would you like to pull CMS media?',
+              type: 'confirm',
+            },
+          ])
+        ).yes;
+
+        if (pullMedia) {
+          const cmsInfo = await getCmsInfo({ args, config: migrationConfig });
+          const bcmsClient = BCMSClientV2({
+            cmsOrigin: cmsInfo.origin,
+            key: {
+              id: cmsInfo.apiKey,
+              secret: cmsInfo.apiSecret,
+            },
+          });
+          titleComponent.update({
+            state: {
+              text: 'Migration V2 - Pull media',
+            },
+          });
+          const progressBar = createTerminalProgressBar({
+            state: {
+              name: 'Pulling media',
+              progress: 0,
+            },
+          });
+          Terminal.pushComponent({
+            name: 'progress',
+            component: progressBar,
+          });
+          Terminal.render();
+          const progressInterval = setInterval(() => {
+            {
+              progressBar.update({
+                state: {
+                  name: 'Pulling media',
+                  progress: progressBar.state
+                    ? progressBar.state.progress + 1
+                    : 0,
+                },
+              });
+              Terminal.render();
+            }
+          }, 500);
+          const allMedia = (await bcmsClient.media.getAll()).filter(
+            (e) => (e.data.type as string) !== MediaV2Type.DIR,
+          );
+          clearInterval(progressInterval);
+          Terminal.removeComponent('progress');
+          Terminal.render();
+          const mediaFs = createFS({
+            base: path.join(Migration.basePath, 'v2_data', 'uploads'),
+          });
+          for (let i = 0; i < allMedia.length; i++) {
+            const media = allMedia[i];
+            process.stdout.write(
+              `[${i + 1}/${allMedia.length}] ` + media.data.name + ' ..... ',
+            );
+            try {
+              const bin = await media.bin();
+              await mediaFs.save(
+                media.data.isInRoot
+                  ? media.data.name
+                  : [
+                      ...media.data.path.split('/').filter((e) => e),
+                      media.data.name,
+                    ],
+                bin as Buffer,
+              );
+              process.stdout.write('Done\n');
+            } catch (error) {
+              process.stdout.write('Fail\n\n');
+              console.error(error);
+              process.stdout.write('\n');
+            }
           }
-        ])).yes
+        }
 
         console.log('All collections pulled.');
       },
