@@ -228,6 +228,10 @@ async function main() {
         Terminal.render();
         await Migration.transform.v2({ args, migrationConfig });
       }
+    } else if (args.version === '3') {
+      if (args.migration === 'push-fsdb') {
+        await Migration.push.v3FSDB({ args, migrationConfig });
+      }
     }
   }
   setTimeout(() => {
