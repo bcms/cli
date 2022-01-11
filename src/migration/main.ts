@@ -439,18 +439,18 @@ export class Migration {
               }),
             );
           } else if (inputProp.type === PropV2Type.LIST) {
-            const ops: PropV2QuillOption[] = [];
-            for (let j = 1; j < inputValue.ops.length; j += 2) {
-              const op = inputValue.ops[j];
-              op.insert += inputValue.ops[j - 1].insert;
-              if (!op.attributes || !op.attributes.indent) {
-                op.attributes = {
-                  indent: 0,
-                  list: 'bullet',
-                };
-              }
-              ops.push(op);
-            }
+            // const ops: PropV2QuillOption[] = [];
+            // for (let j = 1; j < inputValue.ops.length; j += 2) {
+            //   const op = inputValue.ops[j];
+            //   op.insert += inputValue.ops[j - 1].insert;
+            //   if (!op.attributes || !op.attributes.indent) {
+            //     op.attributes = {
+            //       indent: 0,
+            //       list: 'bullet',
+            //     };
+            //   }
+            //   ops.push(op);
+            // }
             output.push(
               Migration.content.v2ResolveList({
                 ops: inputValue.ops,
@@ -497,29 +497,16 @@ export class Migration {
         };
         const nodeContent: EntryV3ContentNode[] = [];
         let i = 0;
-        let textContainer: EntryV3ContentNode[] = [];
+        const textContainer: EntryV3ContentNode[] = [];
         while (i < ops.length) {
           const op = ops[i];
-          if (op.attributes && op.attributes.list) {
-            nodeContent.push({
-              type: EntryV3ContentNodeType.listItem,
-              content: [
-                {
-                  type: EntryV3ContentNodeType.paragraph,
-                  content: JSON.parse(JSON.stringify(textContainer)),
-                },
-              ],
-            });
-            textContainer = [];
-          } else {
-            textContainer.push({
-              type: EntryV3ContentNodeType.text,
-              marks: Migration.content.v2OpAttrsToMarks({
-                attrs: op.attributes ? op.attributes : {},
-              }),
-              text: op.insert || ' ',
-            });
-          }
+          textContainer.push({
+            type: EntryV3ContentNodeType.text,
+            marks: Migration.content.v2OpAttrsToMarks({
+              attrs: op.attributes ? op.attributes : {},
+            }),
+            text: op.insert || ' ',
+          });
           i++;
           // if (op.attributes && typeof op.attributes.indent === 'number') {
           //   if (op.attributes.indent === depth) {
