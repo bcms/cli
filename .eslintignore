@@ -6,4 +6,4 @@ tools.js
 dev.js
 bcms.config.js
 /migration
-/bcms-client-v2
+/src/bcms-client-v2
