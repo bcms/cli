@@ -1,5 +1,5 @@
 import { prompt } from 'inquirer';
-import type { Args } from './util';
+import type { Args } from './types';
 import { FunctionTemplates } from './templates';
 import { createFS } from '@banez/fs';
 

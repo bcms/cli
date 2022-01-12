@@ -1,9 +1,10 @@
 import { prompt } from 'inquirer';
 import * as fse from 'fs-extra';
 import * as path from 'path';
-import { Args, createTasks } from './util';
+import { createTasks } from './util';
 import { ChildProcess } from '@banez/child_process';
 import { createFS } from '@banez/fs';
+import type { Args } from './types';
 
 const fs = createFS({
   base: process.cwd(),

@@ -1,11 +1,12 @@
 import { Docker } from '@banez/docker';
 import type { DockerContainerInfo } from '@banez/docker/types';
 import type { ApiClient } from '@becomes/cms-cloud-client/types';
-import { Args, DockerUtil } from './util';
+import { DockerUtil } from './util';
 import { createTasks } from '@banez/npm-tool';
 import { ChildProcess } from '@banez/child_process';
 import type { ChildProcessOnChunkHelperOutput } from '@banez/child_process/types';
 import { Config } from './config';
+import type { Args } from './types';
 
 export class Shim {
   static readonly containerName = 'bcms-shim';

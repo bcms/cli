@@ -4,7 +4,8 @@ import {
   createCache,
   useApiClient,
 } from '@becomes/cms-cloud-client';
-import { Args, useThrowable } from './util';
+import { useThrowable } from './util';
+import type { Args } from './types';
 
 interface DefaultSetters<Item> {
   set(srcItems: Item[], items: Item | Item[]): void;

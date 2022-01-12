@@ -1,7 +1,6 @@
 import * as FormData from 'form-data';
 import * as path from 'path';
 import {
-  Args,
   createTasks,
   fileReplacer,
   getInstanceId,
@@ -14,6 +13,7 @@ import { prompt } from 'inquirer';
 import { ChildProcess } from '@banez/child_process';
 import { createFS } from '@banez/fs';
 import { StringUtility } from '@banez/string-utility';
+import type { Args } from './types';
 
 const fs = createFS({
   base: process.cwd(),

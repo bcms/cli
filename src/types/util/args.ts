@@ -1,0 +1,30 @@
+export interface Args {
+  bundle?: boolean;
+  plugin?: boolean;
+  create?: boolean;
+  function?: string;
+  public?: boolean;
+  instance?: string;
+  run?: boolean;
+  cms?: string;
+  cloudOrigin?: string;
+  login?: boolean;
+  logout?: boolean;
+  email?: string;
+  password?: string;
+  deploy?: string;
+  otp?: string;
+  terminalLogin?: boolean;
+  install?: boolean;
+  shim?: boolean;
+  version?: string;
+  update?: boolean;
+  migration?: string;
+  collectionPrfx?: string;
+  toCollectionPrfx?: string;
+  dbUrl?: string;
+  toDBUrl?: string;
+  cmsClientOrigin?: string;
+  cmsClientApiKey?: string;
+  cmsClientApiSecret?: string;
+}

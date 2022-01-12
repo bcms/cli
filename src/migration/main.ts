@@ -3,7 +3,7 @@ import { BCMSClient as BCMSClientV2 } from '../../bcms-client-v2';
 import { v4 as uuidv4 } from 'uuid';
 import { createFS } from '@banez/fs';
 import { ChildProcess } from '@banez/child_process';
-import { Args, getCmsInfo, MediaUtil } from '../util';
+import { getCmsInfo, MediaUtil } from '../util';
 import type { ChildProcessOnChunkHelperOutput } from '@banez/child_process/types';
 import { prompt } from 'inquirer';
 import {
@@ -48,6 +48,7 @@ import {
   TemplateV3,
   WidgetV2,
   WidgetV3,
+  Args,
 } from '../types';
 import {
   Terminal,
@@ -389,7 +390,7 @@ export class Migration {
     }): Promise<EntryV3ContentNode[]>;
     v2OpsToNode(data: {
       ops: PropV2QuillOption[];
-      nodeType: EntryV3ContentNodeType;
+      mainNodeType: EntryV3ContentNodeType;
     }): EntryV3ContentNode;
     v2OpAttrsToMarks(data: {
       attrs: {
@@ -404,6 +405,7 @@ export class Migration {
       };
     }): EntryV3ContentNodeMarker[] | undefined;
     v2ResolveList(data: {
+      parentNode?: EntryV3ContentNode;
       ops: PropV2QuillOption[];
       depth: number;
     }): EntryV3ContentNode;
@@ -435,22 +437,10 @@ export class Migration {
             output.push(
               Migration.content.v2OpsToNode({
                 ops: inputValue.ops,
-                nodeType: EntryV3ContentNodeType.paragraph,
+                mainNodeType: EntryV3ContentNodeType.paragraph,
               }),
             );
           } else if (inputProp.type === PropV2Type.LIST) {
-            // const ops: PropV2QuillOption[] = [];
-            // for (let j = 1; j < inputValue.ops.length; j += 2) {
-            //   const op = inputValue.ops[j];
-            //   op.insert += inputValue.ops[j - 1].insert;
-            //   if (!op.attributes || !op.attributes.indent) {
-            //     op.attributes = {
-            //       indent: 0,
-            //       list: 'bullet',
-            //     };
-            //   }
-            //   ops.push(op);
-            // }
             output.push(
               Migration.content.v2ResolveList({
                 ops: inputValue.ops,
@@ -461,7 +451,7 @@ export class Migration {
             output.push(
               Migration.content.v2OpsToNode({
                 ops: inputValue.ops,
-                nodeType: EntryV3ContentNodeType.codeBlock,
+                mainNodeType: EntryV3ContentNodeType.codeBlock,
               }),
             );
           } else if (inputProp.type === PropV2Type.WIDGET) {
@@ -490,90 +480,120 @@ export class Migration {
         }
         return output;
       },
-      v2ResolveList({ ops }) {
-        const node: EntryV3ContentNode = {
-          type: EntryV3ContentNodeType.bulletList,
-          content: [],
-        };
-        const nodeContent: EntryV3ContentNode[] = [];
-        let i = 0;
-        const textContainer: EntryV3ContentNode[] = [];
-        while (i < ops.length) {
+      v2ResolveList({ ops, parentNode, depth }) {
+        for (let i = 0; i < ops.length; i++) {
           const op = ops[i];
-          textContainer.push({
-            type: EntryV3ContentNodeType.text,
-            marks: Migration.content.v2OpAttrsToMarks({
-              attrs: op.attributes ? op.attributes : {},
-            }),
-            text: op.insert || ' ',
-          });
-          i++;
-          // if (op.attributes && typeof op.attributes.indent === 'number') {
-          //   if (op.attributes.indent === depth) {
-          //     const insert = op.insert.replace(/\n/g, '');
-          //     nodeContent.push({
-          //       type: EntryV3ContentNodeType.listItem,
-          //       content: [
-          //         {
-          //           type: EntryV3ContentNodeType.paragraph,
-          //           content: [
-          //             {
-          //               type: EntryV3ContentNodeType.text,
-          //               marks: op.attributes
-          //                 ? Migration.content.v2OpAttrsToMarks({
-          //                     attrs: op.attributes,
-          //                   })
-          //                 : undefined,
-          //               text: insert || ' ',
-          //             },
-          //           ],
-          //         },
-          //       ],
-          //     });
-          //     i++;
-          //   } else if (op.attributes.indent > depth) {
-          //     let subScopeTo = i;
-          //     const newDepth = op.attributes.indent;
-          //     let found = false;
-          //     for (let j = i; j < ops.length; j++) {
-          //       const subOp = ops[j];
-          //       if (
-          //         subOp.attributes &&
-          //         subOp.attributes.indent &&
-          //         subOp.attributes.indent < newDepth
-          //       ) {
-          //         subScopeTo = j;
-          //         found = true;
-          //         break;
-          //       }
-          //     }
-          //     if (!found) {
-          //       subScopeTo = ops.length;
-          //     }
-          //     const subListOps = ops.slice(i, subScopeTo);
-          //     (
-          //       nodeContent[nodeContent.length - 1]
-          //         .content as EntryV3ContentNode[]
-          //     ).push(
-          //       Migration.content.v2ResolveList({
-          //         ops: subListOps,
-          //         depth: newDepth,
-          //       }),
-          //     );
-          //     if (subScopeTo === i) {
-          //       i++;
-          //     } else {
-          //       i = subScopeTo;
-          //     }
-          //   } else {
-          //     i++;
-          //   }
-          // } else {
-          //   i++;
-          // }
+          if (op.attributes && op.attributes.list && !op.attributes.indent) {
+            op.attributes.indent = 0;
+          }
         }
-        node.content = nodeContent;
-        return node;
+        if (!parentNode) {
+          parentNode = {
+            type: EntryV3ContentNodeType.bulletList,
+            content: [],
+          };
+        }
+        const children: Array<{
+          from: number;
+          to: number;
+        }> = [];
+        let indexOffset = 0;
+        let inChild = false;
+        for (let i = 0; i < ops.length; i++) {
+          const op = ops[i];
+          if (op.attributes && op.attributes.list) {
+            if (op.attributes.indent === depth) {
+              if (inChild) {
+                inChild = false;
+                children.push({
+                  from: indexOffset,
+                  to: i - 1,
+                });
+              }
+              indexOffset = i + 1;
+            } else {
+              inChild = true;
+            }
+          }
+          if (i === ops.length - 1 && inChild) {
+            children.push({
+              from: indexOffset,
+              to: i + 1,
+            });
+          }
+        }
+        const nodeContent: EntryV3ContentNode[] = [];
+        let textContainer: EntryV3ContentNode[] = [];
+
+        function addNode(op: PropV2QuillOption) {
+          if (op.attributes && op.attributes.list) {
+            nodeContent.push({
+              type: EntryV3ContentNodeType.listItem,
+              content: [
+                {
+                  type: EntryV3ContentNodeType.paragraph,
+                  content: JSON.parse(JSON.stringify(textContainer)),
+                },
+              ],
+            });
+            textContainer = [];
+          } else {
+            let insert = op.insert;
+            if (insert.startsWith('\n')) {
+              insert = insert.substring(1);
+            }
+            textContainer.push({
+              type: EntryV3ContentNodeType.text,
+              marks: Migration.content.v2OpAttrsToMarks({
+                attrs: op.attributes ? op.attributes : {},
+              }),
+              text: insert || ' ',
+            });
+          }
+        }
+
+        let idx = 0;
+        let childIdx = 0;
+        while (idx < ops.length) {
+          const op = ops[idx];
+          if (children[childIdx]) {
+            if (children[childIdx].from === idx) {
+              const childOps = ops.slice(
+                children[childIdx].from,
+                children[childIdx].to,
+              );
+              const listOp = childOps.find(
+                (e) => e.attributes && e.attributes.list,
+              );
+              const parentOfChild = nodeContent[nodeContent.length - 1];
+              const childNode = Migration.content.v2ResolveList({
+                ops: childOps,
+                depth:
+                  listOp && listOp.attributes && listOp.attributes.indent
+                    ? listOp.attributes.indent
+                    : 0,
+              });
+              if (parentOfChild) {
+                (parentOfChild.content as EntryV3ContentNode[]).push(childNode);
+              } else {
+                nodeContent.push(childNode);
+              }
+              idx = children[childIdx].to;
+              childIdx++;
+            } else {
+              addNode(op);
+              idx++;
+            }
+          } else {
+            addNode(op);
+            idx++;
+          }
+        }
+        parentNode.content = [
+          ...(parentNode.content as EntryV3ContentNode[]),
+          ...nodeContent,
+        ];
+        return parentNode;
       },
       v2OpAttrsToMarks({ attrs }) {
         const marks: EntryV3ContentNodeMarker[] = [];
@@ -608,79 +628,35 @@ export class Migration {
         }
         return marks.length > 0 ? marks : undefined;
       },
-      v2OpsToNode({ ops, nodeType }) {
-        const node: EntryV3ContentNode = {
-          type: nodeType,
+      v2OpsToNode({ ops, mainNodeType }) {
+        const mainNode: EntryV3ContentNode = {
+          type: mainNodeType,
           content: [],
         };
-        const nodeContent: EntryV3ContentNode[] = [];
-        let inList = false;
-        let skipPush = false;
-        const listOps: PropV2QuillOption[] = [];
+        const mainNodeContent: EntryV3ContentNode[] = [];
+
         for (let i = 0; i < ops.length; i++) {
           const op = ops[i];
-          const type: EntryV3ContentNodeType = EntryV3ContentNodeType.text;
-
-          if (op.attributes) {
-            if (op.attributes.list) {
-              inList = true;
-              if (ops[i + 2]) {
-                const nextListItem = ops[i + 2];
-                if (nextListItem.attributes && nextListItem.attributes.list) {
-                  op.insert += ops[i - 1].insert;
-                  op.attributes = op.attributes ? op.attributes : {};
-                  if (ops[i - 1].attributes) {
-                    op.attributes = {
-                      ...op.attributes,
-                      ...ops[i - 1].attributes,
-                    };
-                  }
-                  if (!op.attributes.indent) {
-                    op.attributes.indent = 0;
-                  }
-                  i++;
-                }
-                listOps.push(op);
-              }
-            }
-
-            if (!inList && !skipPush) {
-              nodeContent.push({
-                type,
-                text: op.insert ? op.insert : ' ',
-                attrs:
-                  nodeType === EntryV3ContentNodeType.codeBlock
-                    ? {
-                        language: null,
-                      }
-                    : undefined,
-                marks: op.attributes
-                  ? Migration.content.v2OpAttrsToMarks({ attrs: op.attributes })
-                  : undefined,
-              });
-            } else if (skipPush) {
-              skipPush = false;
-            }
-          } else {
-            if (inList) {
-              inList = false;
-              skipPush = true;
-              nodeContent.push(
-                Migration.content.v2ResolveList({
-                  ops: listOps,
-                  depth: 0,
-                }),
-              );
-            } else {
-              nodeContent.push({
-                type: EntryV3ContentNodeType.text,
-                text: op.insert ? op.insert : ' ',
-              });
-            }
+          let insert = op.insert;
+          if (insert.startsWith('\n')) {
+            insert = insert.substring(1);
           }
+          mainNodeContent.push({
+            type: EntryV3ContentNodeType.text,
+            attrs:
+              mainNodeType === EntryV3ContentNodeType.codeBlock
+                ? {
+                    language: null,
+                  }
+                : undefined,
+            marks: op.attributes
+              ? Migration.content.v2OpAttrsToMarks({ attrs: op.attributes })
+              : undefined,
+            text: insert || ' ',
+          });
         }
-        node.content = nodeContent;
-        return node;
+        mainNode.content = mainNodeContent;
+        return mainNode;
       },
     };
   }
@@ -1128,7 +1104,11 @@ export class Migration {
         ).yes;
 
         if (transformMedia) {
-          Terminal.removeComponent('list');
+          terminalListItems['media_transform'] = {
+            name: 'Media transformation',
+            maker: '♺',
+          };
+          updateTerminalList();
           const allMedia: MediaV3[] = JSON.parse(
             await outputFs.readString(`${toPrfx}_medias.json`),
           );
@@ -1158,6 +1138,8 @@ export class Migration {
             }
             progress = (100 / allMedia.length) * (j + 1);
           }
+          terminalListItems['media_transform'].maker = '✓';
+          updateTerminalList();
         }
 
         Terminal.removeComponent('progress');
@@ -1335,7 +1317,7 @@ export class Migration {
       async v3FSDB({ args, migrationConfig }) {
         const titleComponent = createTerminalTitle({
           state: {
-            text: 'Migration V2 - Pulling data',
+            text: 'Migration V3 - Converting data to FSDB.',
           },
         });
         Terminal.pushComponent({
@@ -1421,11 +1403,7 @@ export class Migration {
           terminalListItems[cName].maker = '✓';
           updateTerminalList();
         }
-        await inputFs.save(
-          '/home/banez/Documents/cms/v3/backend/db/bcms.fsdb.json',
-          JSON.stringify(fsdbOutput),
-        );
-        // await inputFs.save(`${prfx}.fsdb.json`, JSON.stringify(fsdbOutput));
+        await inputFs.save(`${prfx}.fsdb.json`, JSON.stringify(fsdbOutput));
       },
     };
   }

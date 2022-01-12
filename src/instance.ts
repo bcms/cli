@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { Args, DockerUtil, Select } from './util';
+import { DockerUtil, Select } from './util';
 import { prompt } from 'inquirer';
 import type {
   ApiClient,
@@ -14,6 +14,7 @@ import type { ChildProcessOnChunkHelperOutput } from '@banez/child_process/types
 import { Shim } from './shim';
 import { createTasks } from '@banez/npm-tool';
 import { createFS } from '@banez/fs';
+import type { Args } from './types';
 
 export class Instance {
   static async install({

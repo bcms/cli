@@ -1,7 +1,7 @@
 import * as open from 'open';
 import { prompt } from 'inquirer';
 import type { ApiClient } from '@becomes/cms-cloud-client/types';
-import type { Args } from './util';
+import type { Args } from './types';
 import { EventManager } from './event';
 
 export async function login({

@@ -1,6 +1,5 @@
 import { prompt } from 'inquirer';
-import type { GetCmsInfoResult, MigrationConfig } from '../types';
-import type { Args } from './args';
+import type { GetCmsInfoResult, MigrationConfig, Args } from '../types';
 
 export async function getCmsInfo({
   args,

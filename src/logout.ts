@@ -1,5 +1,5 @@
 import type { ApiClient } from '@becomes/cms-cloud-client/types';
-import type { Args } from './util';
+import type { Args } from './types';
 
 export async function logout({
   client,
