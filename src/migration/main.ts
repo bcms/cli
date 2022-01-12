@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { BCMSClient as BCMSClientV2 } from '../../bcms-client-v2';
+import { BCMSClient as BCMSClientV2 } from '../bcms-client-v2';
 import { v4 as uuidv4 } from 'uuid';
 import { createFS } from '@banez/fs';
 import { ChildProcess } from '@banez/child_process';
