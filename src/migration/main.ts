@@ -1117,6 +1117,7 @@ export class Migration {
             path.join(Migration.basePath, 'v3_data', 'uploads'),
           );
           let progress = 0;
+          const mediaToRemove: string[] = [];
           for (let j = 0; j < allMedia.length; j++) {
             const media = allMedia[j];
 
@@ -1129,15 +1130,51 @@ export class Migration {
             });
             Terminal.render();
 
-            if (media.type === MediaV3Type.IMG) {
-              await MediaUtil.v3.createImageThumbnail({ media, allMedia });
-            } else if (media.type === MediaV3Type.VID) {
-              await MediaUtil.v3.createVideoThumbnail({ media, allMedia });
-            } else if (media.type === MediaV3Type.GIF) {
-              await MediaUtil.v3.createGifThumbnail({ media, allMedia });
+            const pathToMedia = (
+              await MediaUtil.v3.getPath({
+                media,
+                allMedia,
+              })
+            )
+              .substring(1)
+              .split('/');
+            if (
+              media.type !== MediaV3Type.DIR &&
+              !(await inputFs.exist(['uploads', ...pathToMedia], true))
+            ) {
+              mediaToRemove.push(media._id);
+            } else {
+              if (media.type === MediaV3Type.IMG) {
+                await MediaUtil.v3.createImageThumbnail({ media, allMedia });
+                const metadata = await MediaUtil.v3.imageMetadata({
+                  media,
+                  allMedia,
+                });
+                if (metadata) {
+                  if (metadata.width) {
+                    media.width = metadata.width;
+                  }
+                  if (metadata.height) {
+                    media.height = metadata.height;
+                  }
+                }
+              } else if (media.type === MediaV3Type.VID) {
+                await MediaUtil.v3.createVideoThumbnail({ media, allMedia });
+              } else if (media.type === MediaV3Type.GIF) {
+                await MediaUtil.v3.createGifThumbnail({ media, allMedia });
+              }
             }
+
             progress = (100 / allMedia.length) * (j + 1);
           }
+          await outputFs.save(
+            `${toPrfx}_medias.json`,
+            JSON.stringify(
+              allMedia.filter((e) => !mediaToRemove.includes(e._id)),
+              null,
+              '  ',
+            ),
+          );
           terminalListItems['media_transform'].maker = '✓';
           updateTerminalList();
         }

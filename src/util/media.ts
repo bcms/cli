@@ -21,6 +21,10 @@ export class MediaUtil {
       media: MediaV3;
       allMedia: MediaV3[];
     }): Promise<void>;
+    imageMetadata(data: {
+      media: MediaV3;
+      allMedia: MediaV3[];
+    }): Promise<sharp.Metadata | null>;
   } {
     const basePath = nodejsPath.join(Migration.basePath, 'v3_data', 'uploads');
     const outputFs = createFS({
@@ -188,6 +192,21 @@ export class MediaUtil {
             output,
           );
         }
+      },
+      async imageMetadata({ media, allMedia }) {
+        const pathToMedia = (
+          await MediaUtil.v3.getPath({
+            media,
+            allMedia,
+          })
+        )
+          .substring(1)
+          .split('/');
+        if (await outputFs.exist(pathToMedia, true)) {
+          const image = sharp(await outputFs.read(pathToMedia));
+          return await image.metadata();
+        }
+        return null;
       },
     };
   }
