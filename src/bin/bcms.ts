@@ -31,6 +31,7 @@ import { MigrationConfig, MigrationConfigSchema } from '../types';
 import { ObjectUtility } from '@banez/object-utility';
 import { ObjectUtilityError } from '@banez/object-utility/types';
 import { createTerminalTitle, Terminal } from '../terminal';
+import { Most } from '../most';
 
 async function main() {
   const fs = createFS({
@@ -233,6 +234,8 @@ async function main() {
         await Migration.push.v3FSDB({ args, migrationConfig });
       }
     }
+  } else if (args.most) {
+    await Most.resolve({ args });
   }
   setTimeout(() => {
     process.exit(0);

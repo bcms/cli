@@ -1,4 +1,3 @@
-import { readFile } from 'fs/promises';
 import * as AdmZip from 'adm-zip';
 import { createFS } from '@banez/fs';
 
@@ -12,7 +11,7 @@ export class Zip {
       const file = files[i];
       const fileParts = file.path.abs.split('/');
       const fileName = fileParts[fileParts.length - 1];
-      const fileData = await readFile(file.path.abs);
+      const fileData = await fs.read(file.path.abs);
       zip.addFile(file.dir ? `${file.dir}/${fileName}` : fileName, fileData);
     }
     return zip.toBuffer();

@@ -1,4 +1,4 @@
-import type { Args } from "../types";
+import type { Args } from '../types';
 
 export function parseArgs(rawArgs: string[]): Args {
   const args: {
@@ -127,6 +127,9 @@ export function parseArgs(rawArgs: string[]): Args {
     cmsClientApiSecret: {
       type: 'string',
     },
+    most: {
+      type: 'string',
+    },
   };
   const groups: {
     [name: string]: {
@@ -214,6 +217,9 @@ export function parseArgs(rawArgs: string[]): Args {
 
     '--cms-client-api-secret': groups.cmsClientApiSecret.name,
     '--ccas': groups.cmsClientApiSecret.name,
+
+    '--most': groups.most.name,
+    '--m': groups.most.name,
   };
   const output: {
     [name: string]: string | boolean | undefined;

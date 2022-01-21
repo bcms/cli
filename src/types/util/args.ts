@@ -27,4 +27,5 @@ export interface Args {
   cmsClientOrigin?: string;
   cmsClientApiKey?: string;
   cmsClientApiSecret?: string;
+  most?: string;
 }

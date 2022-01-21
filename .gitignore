@@ -15,6 +15,9 @@
 /src/util/_bcms_security.json
 /migration
 /bcms.migration.json
+/bcms.config.js
+/bcms
+/static
 
 # Logs
 /log
