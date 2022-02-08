@@ -163,9 +163,23 @@ async function main() {
     } else if (args.cms === 'clone') {
       await CMS.clone({ args, client });
     }
-  } else if (args.plugin) {
-    if (args.bundle) {
+  } else if (typeof args.plugin === 'string') {
+    if (args.plugin === 'bundle') {
       await Plugin.bundle(args);
+    } else if (args.plugin === 'deploy') {
+      Terminal.pushComponent({
+        name: 'title',
+        component: createTerminalTitle({
+          state: {
+            text: 'Plugin deploy',
+          },
+        }),
+      });
+      Terminal.render();
+      await Plugin.deploy({
+        args,
+        client,
+      });
     }
   } else if (args.function) {
     if (args.create) {

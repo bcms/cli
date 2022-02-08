@@ -1,6 +1,6 @@
 export interface Args {
   bundle?: boolean;
-  plugin?: boolean;
+  plugin?: string;
   create?: boolean;
   function?: string;
   public?: boolean;

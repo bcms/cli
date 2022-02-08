@@ -53,7 +53,7 @@ export function parseArgs(rawArgs: string[]): Args {
       type: 'boolean',
     },
     plugin: {
-      type: 'boolean',
+      type: 'string',
     },
     create: {
       type: 'boolean',

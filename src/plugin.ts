@@ -1,10 +1,14 @@
 import { prompt } from 'inquirer';
 import * as fse from 'fs-extra';
 import * as path from 'path';
+import * as FormData from 'form-data';
 import { createTasks } from './util';
 import { ChildProcess } from '@banez/child_process';
 import { createFS } from '@banez/fs';
 import type { Args } from './types';
+import type { ApiClient } from '@becomes/cms-cloud-client/types';
+import { login } from './login';
+import { createTerminalProgressBar, Terminal } from './terminal';
 
 const fs = createFS({
   base: process.cwd(),
@@ -176,5 +180,100 @@ export class Plugin {
       },
     ]);
     await tasks.run();
+  }
+  static async deploy({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    if (!(await fs.exist('dist'))) {
+      await Plugin.bundle(args);
+    }
+    let files = await fs.readdir('dist');
+    let file = files.find((e) => e.endsWith('.tgz'));
+    if (!file) {
+      await Plugin.bundle(args);
+      files = await fs.readdir('dist');
+      file = files.find((e) => e.endsWith('.tgz'));
+    }
+    const fileName = file as string;
+    if (!(await client.isLoggedIn())) {
+      await login({ args, client });
+    }
+    const user = await client.user.get();
+    const instances = (await client.instance.getAll()).filter((e) =>
+      e.user.list.find((u) => u.id === user._id && u.role === 'ADMIN'),
+    );
+    if (instances.length === 0) {
+      console.log('You do not have ADMIN access to any instance.');
+      return;
+    }
+    const promptResult = await prompt<{ instId: string }>([
+      {
+        name: 'instId',
+        type: 'list',
+        choices: instances.map((inst) => {
+          return {
+            name: inst.name,
+            value: inst._id,
+          };
+        }),
+        message: 'Select an instance to deploy this plugin to:',
+      },
+    ]);
+    const inst = instances.find((e) => e._id === promptResult.instId);
+    if (!inst) {
+      throw Error('Failed to find instance.');
+    }
+    const pluginInfo = JSON.parse(
+      await fs.readString('bcms-plugin.config.json'),
+    );
+    const pluginNameEncoded = pluginInfo.pluginName
+      .toLowerCase()
+      .replace(/ /g, '-')
+      .replace(/_/g, '-')
+      .replace(/--/g, '-')
+      .replace(/[^a-z0-9---]/g, '');
+    const packageJson = JSON.parse(
+      await fs.readString(['dist', pluginNameEncoded, 'package.json']),
+    );
+    const tag = Buffer.from(packageJson.name).toString('hex');
+    const version = packageJson.version;
+    const tgz = await fs.read(['dist', fileName]);
+    const formData = new FormData();
+    formData.append('media', tgz, {
+      filename: fileName,
+      contentType: 'application/x-compressed-tar',
+    });
+    const progressBar = createTerminalProgressBar({
+      state: {
+        name: 'Upload plugin to the cloud',
+        progress: 0,
+      },
+    });
+    Terminal.pushComponent({
+      name: 'progress',
+      component: progressBar,
+    });
+    await client.media.set.instancePlugin({
+      instanceId: inst._id,
+      orgId: inst.org.id,
+      name: pluginInfo.pluginName,
+      tag,
+      version,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      formData: formData as any,
+      onProgress(value) {
+        progressBar.update({
+          state: {
+            name: 'Upload plugin to the cloud',
+            progress: value,
+          },
+        });
+        Terminal.render();
+      },
+    });
   }
 }

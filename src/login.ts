@@ -38,8 +38,8 @@ export async function login({
     console.log('You are now logged in to the BCMS Cloud.');
   } else {
     const url = `${args.cloudOrigin}/login?type=cb&d=${Buffer.from(
-      JSON.stringify({ host: 'http://localhost:1278' }),
-    ).toString('base64url')}`;
+      JSON.stringify({ host: 'localhost:1278' }),
+    ).toString('hex')}`;
     await open(url);
     console.log(`Open URL in your browser to login to the BCMS Cloud: ${url}`);
     await new Promise<void>((resolve) => {
