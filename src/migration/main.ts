@@ -49,6 +49,7 @@ import {
   WidgetV2,
   WidgetV3,
   Args,
+  MigrationConfigSchema,
 } from '../types';
 import {
   Terminal,
@@ -56,6 +57,10 @@ import {
   createTerminalList,
   createTerminalTitle,
 } from '../terminal';
+import type { ApiClient } from '@becomes/cms-cloud-client/types';
+import type { FS } from '@banez/fs/types';
+import { ObjectUtility } from '@banez/object-utility';
+import { ObjectUtilityError } from '@banez/object-utility/types';
 
 function nodeToText({ node }: { node: EntryV3ContentNode }) {
   let output = '';
@@ -149,6 +154,74 @@ export class Migration {
       '_widgets',
     ],
   };
+
+  static async resolve({
+    args,
+    rootFs,
+  }: {
+    args: Args;
+    client: ApiClient;
+    rootFs: FS;
+  }): Promise<void> {
+    let migrationConfig: MigrationConfig = {} as never;
+
+    if (await rootFs.exist('bcms.migration.json', true)) {
+      migrationConfig = JSON.parse(
+        await rootFs.readString('bcms.migration.json'),
+      );
+      const result = ObjectUtility.compareWithSchema(
+        migrationConfig,
+        MigrationConfigSchema,
+        'migrationConfig',
+      );
+      if (result instanceof ObjectUtilityError) {
+        throw Error(result.message);
+      }
+    } else {
+      migrationConfig = {
+        database: {
+          from: {
+            collectionPrefix: args.collectionPrfx || 'bcms',
+            url: args.dbUrl || '',
+          },
+          to: {
+            collectionPrefix: args.toCollectionPrfx || 'bcms',
+            url: args.toDBUrl || '',
+          },
+        },
+      };
+    }
+
+    if (args.version === '2') {
+      if (args.migration === 'pull') {
+        Terminal.pushComponent({
+          name: 'title',
+          component: createTerminalTitle({
+            state: {
+              text: 'Migration V2 - Pull',
+            },
+          }),
+        });
+        Terminal.render();
+        await this.pull.v2({ args, migrationConfig });
+      } else if (args.migration === 'transform') {
+        Terminal.pushComponent({
+          name: 'title',
+          component: createTerminalTitle({
+            state: {
+              text: 'Migration V2 - Transform V2 to V3 database',
+            },
+          }),
+        });
+        Terminal.render();
+        await this.transform.v2({ args, migrationConfig });
+      }
+    } else if (args.version === '3') {
+      if (args.migration === 'create-fsdb') {
+        await this.push.v3FSDB({ args, migrationConfig });
+      }
+    }
+  }
 
   static getPrefix({
     args,

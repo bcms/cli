@@ -18,6 +18,17 @@ import type { Args } from './types';
 import { StringUtility } from '@banez/string-utility';
 
 export class Instance {
+  static async resolve({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    if (args.install) {
+      await this.install({ args, client });
+    }
+  }
   static async install({
     args,
     client,

@@ -8,15 +8,42 @@ import { createFS } from '@banez/fs';
 import type { Args } from './types';
 import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import { login } from './login';
-import { createTerminalProgressBar, Terminal } from './terminal';
+import {
+  createTerminalProgressBar,
+  createTerminalTitle,
+  Terminal,
+} from './terminal';
 
 const fs = createFS({
   base: process.cwd(),
 });
 
 export class Plugin {
-  static async bundle(_args: Args): Promise<void> {
+  static async resolve({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    if (args.plugin === 'bundle') {
+      await this.bundle();
+    } else if (args.plugin === 'deploy') {
+      Terminal.pushComponent({
+        name: 'title',
+        component: createTerminalTitle({
+          state: {
+            text: 'Plugin deploy',
+          },
+        }),
+      });
+      Terminal.render();
+      await this.deploy({ args, client });
+    }
+  }
+  static async bundle(): Promise<void> {
     let pluginName = '';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let packageJson: any = {};
     const tasks = createTasks([
       {
@@ -189,12 +216,12 @@ export class Plugin {
     client: ApiClient;
   }): Promise<void> {
     if (!(await fs.exist('dist'))) {
-      await Plugin.bundle(args);
+      await Plugin.bundle();
     }
     let files = await fs.readdir('dist');
     let file = files.find((e) => e.endsWith('.tgz'));
     if (!file) {
-      await Plugin.bundle(args);
+      await Plugin.bundle();
       files = await fs.readdir('dist');
       file = files.find((e) => e.endsWith('.tgz'));
     }

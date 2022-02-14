@@ -1,0 +1,52 @@
+--------------------------------------------------------------
+-------------------------- BCMS CLI --------------------------
+--------------------------------------------------------------
+
+--plugin <command>
+  commands:
+    deploy  - deploy plugin to a BCMS instance
+    bundle  - prepare plugin for deployment
+
+--function <name> <options>
+  options:
+    --create [boolean] - create a function
+    --public [boolean] - make function public
+
+--login <options> - sign in to BCMS Cloud account
+  options:
+    --otp            [string]  - use specified OTP for login
+    --terminal-login [boolean] - prompt login in terminal session
+
+--logout - sign out of BCMS Cloud account
+
+--cms <command>
+  commands:
+    bundle  - prepare the project for deployment
+    deploy  - deploy the project to BCMS Cloud
+    clone   - create starter project and get instance data if available
+
+--instance <id> <options>
+  options:
+    --install - install instance on the current server
+
+--migration <command> <options>
+  command:
+    pull         - pull data from existing BCMS
+    transform    - transform data from 1 version to next
+    create-fsdb  - create valid FSDB database with current data
+  options:
+    --version - migration version (can be 2 or 3)
+
+--most <command>
+  commands:
+    pull-content  - pull content from the BCMS
+    pull-media    - pull media from the BCMS
+    pull-types    - create types for data in the BCMS
+    all           - run all commands
+
+--shim <command>
+  commands:
+    install  - install BCMS SHIM on the current server
+    update   - update BCMS SHIM
+
+--cloudOrigin <url> - set an origin of the BCMS Cloud for running command

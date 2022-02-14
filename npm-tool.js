@@ -1,6 +1,9 @@
-const fse = require('fs-extra');
-const path = require('path');
+const { createFS } = require('@banez/fs');
 const { createConfig } = require('@banez/npm-tool');
+
+const fs = createFS({
+  base: process.cwd(),
+});
 
 module.exports = createConfig({
   bundle: {
@@ -8,19 +11,17 @@ module.exports = createConfig({
       {
         title: 'Copy public assets.',
         async task() {
-          await fse.copy(
-            path.join(process.cwd(), 'src', 'public'),
-            path.join(process.cwd(), 'dist', 'public'),
+          await fs.copy(['src', 'public'], ['dist', 'public']);
+          await fs.copy(
+            ['src', 'help', 'general.txt'],
+            ['dist', 'help', 'general.txt'],
           );
         },
       },
       {
         title: 'Copy BCMS Client V2.',
         async task() {
-          await fse.copy(
-            path.join(process.cwd(), 'src', 'bcms-client-v2'),
-            path.join(process.cwd(), 'dist', 'bcms-client-v2'),
-          );
+          await fs.copy(['src', 'bcms-client-v2'], ['dist', 'bcms-client-v2']);
         },
       },
     ],

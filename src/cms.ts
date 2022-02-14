@@ -20,6 +20,15 @@ const fs = createFS({
 });
 
 export class CMS {
+  static async resolve({args, client}: {args: Args, client: ApiClient}): Promise<void> {
+    if (args.cms === 'bundle') {
+      await this.bundle();
+    } else if (args.cms === 'deploy') {
+      await this.deploy({args, client});
+    } else if (args.cms === 'clone') {
+      await this.clone({args, client})
+    }
+  }
   static async bundle(): Promise<void> {
     const tasks = createTasks([
       {

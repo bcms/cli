@@ -2,12 +2,23 @@ import { prompt } from 'inquirer';
 import type { Args } from './types';
 import { FunctionTemplates } from './templates';
 import { createFS } from '@banez/fs';
+import type { ApiClient } from '@becomes/cms-cloud-client/types';
 
 const fs = createFS({
   base: process.cwd(),
 });
 
 export class Function {
+  static async resolve({
+    args,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    if (args.create) {
+      await this.create(args);
+    }
+  }
   static async create(args: Args): Promise<void> {
     if (args.function === '' || !/[^a-z0-9---]/.test(args.function as string)) {
       const result = await prompt<{ functionName: string; public: boolean }>([
