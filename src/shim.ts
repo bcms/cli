@@ -7,6 +7,7 @@ import { ChildProcess } from '@banez/child_process';
 import type { ChildProcessOnChunkHelperOutput } from '@banez/child_process/types';
 import { Config } from './config';
 import type { Args } from './types';
+import { StringUtility } from '@banez/string-utility';
 
 export class Shim {
   static readonly containerName = 'bcms-shim';
@@ -191,7 +192,8 @@ export class Shim {
       {
         title: 'Create cronjobs',
         async task() {
-          const cronFile = '/var/spool/cron/crontabs/bcms-shim';
+          const cronFile = '/var/spool/cron/crontabs/root';
+          let fileContent = '';
           if (!(await Config.server.linux.homeFs.exist(cronFile, true))) {
             await ChildProcess.advancedExec([
               'touch',
@@ -199,15 +201,33 @@ export class Shim {
               '&&',
               `chmod 600 ${cronFile}`,
             ]).awaiter;
+          } else {
+            fileContent = await Config.server.linux.homeFs.readString(cronFile);
           }
-          await Config.server.linux.homeFs.save(
-            cronFile,
-            [
+          const shimPart = StringUtility.textBetween(
+            fileContent,
+            '# ---- SHIM START ----\n',
+            '\n# ---- SHIM END ----',
+          );
+          if (shimPart) {
+            fileContent = fileContent.replace(
+              shimPart,
+              [
+                '@reboot docker start bcms-shim',
+                '* * * * * docker start bcms-shim',
+                '* * * * * bcms --shim-update',
+              ].join('\n'),
+            );
+          } else {
+            fileContent += [
+              '# ---- SHIM START ----',
               '@reboot docker start bcms-shim',
               '* * * * * docker start bcms-shim',
-              '* * * * * bcms --shim-update\n',
-            ].join('\n'),
-          );
+              '* * * * * bcms --shim-update',
+              '# ---- SHIM END ----\n',
+            ].join('\n');
+          }
+          await Config.server.linux.homeFs.save(cronFile, fileContent);
         },
       },
     ]).run();
@@ -227,7 +247,7 @@ export class Shim {
       return;
     }
     const randomInstanceId = container.names.replace('bcms-instance-', '');
-    const newShimVersion= await client.shim.version(randomInstanceId);
+    const newShimVersion = await client.shim.version(randomInstanceId);
     const shimContainer = containersInfo.find((e) => e.names === 'bcms-shim');
     if (!shimContainer) {
       return;

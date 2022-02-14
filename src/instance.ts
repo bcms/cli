@@ -15,6 +15,7 @@ import { Shim } from './shim';
 import { createTasks } from '@banez/npm-tool';
 import { createFS } from '@banez/fs';
 import type { Args } from './types';
+import { StringUtility } from '@banez/string-utility';
 
 export class Instance {
   static async install({
@@ -410,7 +411,8 @@ export class Instance {
                   'mongo:5-focal': [],
                 },
               });
-              const cronFile = `/var/spool/cron/crontabs/${dbContainerName}`;
+              const cronFile = `/var/spool/cron/crontabs/root`;
+              let fileContent = '';
               if (!(await Config.server.linux.homeFs.exist(cronFile, true))) {
                 await ChildProcess.advancedExec([
                   'touch',
@@ -418,14 +420,33 @@ export class Instance {
                   '&&',
                   `chmod 600 ${cronFile}`,
                 ]).awaiter;
+              } else {
+                fileContent = await Config.server.linux.homeFs.readString(
+                  cronFile,
+                );
               }
-              await Config.server.linux.homeFs.save(
-                cronFile,
-                [
-                  `@reboot docker start ${dbContainerName}`,
-                  `* * * * * docker start ${dbContainerName}\n`,
-                ].join('\n'),
+              const dbPart = StringUtility.textBetween(
+                fileContent,
+                `# ---- DB ${dbContainerName} ----\n`,
+                `\n# ---- DB END ${dbContainerName}`,
               );
+              if (dbPart) {
+                fileContent = fileContent.replace(
+                  dbPart,
+                  [
+                    `@reboot docker start ${dbContainerName}`,
+                    `* * * * * docker start ${dbContainerName}`,
+                  ].join('\n'),
+                );
+              } else {
+                fileContent += [
+                  `# ---- DB ${dbContainerName} ----`,
+                  `@reboot docker start ${dbContainerName}`,
+                  `* * * * * docker start ${dbContainerName}`,
+                  `# ---- DB END ${dbContainerName}\n`,
+                ].join('\n');
+              }
+              await Config.server.linux.homeFs.save(cronFile, fileContent);
             }
             await instanceFs.save(
               'db-info.json',
