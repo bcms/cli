@@ -11,6 +11,19 @@ import type { Args } from './types';
 export class Shim {
   static readonly containerName = 'bcms-shim';
 
+  static async resolve({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    if (args.shim === 'install') {
+      await this.install({ args, client });
+    } else if (args.shim === 'update') {
+      await this.update({ args, client });
+    }
+  }
   static async install({
     args,
   }: {
@@ -199,7 +212,79 @@ export class Shim {
       },
     ]).run();
   }
-  static async update(_data: { args: Args }): Promise<void> {
-    // TODO
+  static async update({
+    client,
+    args,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    const containersInfo = await Docker.container.list();
+    const container = containersInfo.find((e) =>
+      e.names.startsWith('bcms-instance-'),
+    );
+    if (!container) {
+      return;
+    }
+    const randomInstanceId = container.names.replace('bcms-instance-', '');
+    const newShimVersion= await client.shim.version(randomInstanceId);
+    const shimContainer = containersInfo.find((e) => e.names === 'bcms-shim');
+    if (!shimContainer) {
+      return;
+    }
+    if (shimContainer.image !== `becomes/cms-shim:${newShimVersion}`) {
+      await Docker.image.pull(`becomes/cms-shim:${newShimVersion}`);
+      await Docker.container.stop('bcms-shim');
+      await Docker.container.remove('bcms-shim');
+      await ChildProcess.advancedExec(
+        [
+          'cd /var/lib',
+          '&&',
+          'ls -l',
+          '&&',
+          'docker',
+          'run',
+          '-d',
+          '--network',
+          'bcms',
+          '-v',
+          '/var/run/docker.sock:/var/run/docker.sock',
+          '-v',
+          `${Config.server.linux.homeBase}/storage:/app/storage`,
+          '-v',
+          `${Config.server.linux.homeBase}/licenses:/app/licenses`,
+          '-e',
+          'PORT=1279',
+          '-e',
+          `BCMS_CLOUD_DOMAIN=${
+            args.cloudOrigin
+              ? args.cloudOrigin.replace('https://', '').replace('http://', '')
+              : 'cloud.thebcms.com'
+          }`,
+          '-e',
+          `BCMS_CLOUD_PORT=${
+            args.cloudOrigin
+              ? args.cloudOrigin.startsWith('https')
+                ? '443'
+                : '80'
+              : '443'
+          }`,
+          '-e',
+          'BCMS_MANAGE=true',
+          '--name',
+          'bcms-shim',
+          '--hostname',
+          'bcms-shim',
+          `becomes/cms-shim:${newShimVersion}`,
+          '&&',
+          'ls -l',
+        ].join(' '),
+        {
+          onChunk(type, chunk) {
+            process[type].write(chunk);
+          },
+        },
+      ).awaiter;
+    }
   }
 }

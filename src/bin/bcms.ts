@@ -32,6 +32,7 @@ import { ObjectUtility } from '@banez/object-utility';
 import { ObjectUtilityError } from '@banez/object-utility/types';
 import { createTerminalTitle, Terminal } from '../terminal';
 import { Most } from '../most';
+import { Shim } from '../shim';
 
 async function main() {
   const fs = createFS({
@@ -250,6 +251,8 @@ async function main() {
     }
   } else if (args.most) {
     await Most.resolve({ args });
+  } else if (typeof args.shim === 'string') {
+    await Shim.resolve({ args, client });
   }
   setTimeout(() => {
     process.exit(0);

@@ -16,7 +16,7 @@ export interface Args {
   otp?: string;
   terminalLogin?: boolean;
   install?: boolean;
-  shim?: boolean;
+  shim?: string;
   version?: string;
   update?: boolean;
   migration?: string;

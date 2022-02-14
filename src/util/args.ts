@@ -95,7 +95,7 @@ export function parseArgs(rawArgs: string[]): Args {
       type: 'boolean',
     },
     shim: {
-      type: 'boolean',
+      type: 'string',
     },
     version: {
       type: 'string',
