@@ -1,4 +1,5 @@
 export interface Args {
+  help?: boolean;
   bundle?: boolean;
   plugin?: string;
   create?: boolean;

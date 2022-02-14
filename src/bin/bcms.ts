@@ -29,6 +29,7 @@ import { createFS } from '@banez/fs';
 import { Migration } from '../migration';
 import { Most } from '../most';
 import { Shim } from '../shim';
+import { help } from '../help';
 
 async function main() {
   const fs = createFS({
@@ -166,6 +167,8 @@ async function main() {
     await Most.resolve({ args });
   } else if (typeof args.shim === 'string') {
     await Shim.resolve({ args, client });
+  } else if (args.help) {
+    await help();
   }
   setTimeout(() => {
     process.exit(0);

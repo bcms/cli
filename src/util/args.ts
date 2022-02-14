@@ -130,6 +130,9 @@ export function parseArgs(rawArgs: string[]): Args {
     most: {
       type: 'string',
     },
+    help: {
+      type: 'boolean',
+    },
   };
   const groups: {
     [name: string]: {
@@ -220,6 +223,9 @@ export function parseArgs(rawArgs: string[]): Args {
 
     '--most': groups.most.name,
     '--m': groups.most.name,
+
+    '--help': groups.help.name,
+    '--h': groups.help.name,
   };
   const output: {
     [name: string]: string | boolean | undefined;
