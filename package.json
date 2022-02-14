@@ -28,7 +28,7 @@
     "@banez/object-utility": "^1.0.0",
     "@banez/string-utility": "^1.0.1",
     "@becomes/cms-client": "^3.0.0-alpha2",
-    "@becomes/cms-cloud-client": "^1.0.0-alpha.1",
+    "@becomes/cms-cloud-client": "^1.0.0-alpha.3",
     "@becomes/cms-most": "^2.0.0-alpha5",
     "@becomes/purple-cheetah": "^3.3.2",
     "@becomes/purple-cheetah-mod-jwt": "^1.1.0",
