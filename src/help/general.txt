@@ -24,6 +24,7 @@
     bundle  - prepare the project for deployment
     deploy  - deploy the project to BCMS Cloud
     clone   - create starter project and get instance data if available
+    pull    - pull functions, events, jobs and plugins for current instance
 
 --instance <id> <options>
   options:

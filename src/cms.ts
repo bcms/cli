@@ -1,34 +1,218 @@
 import * as FormData from 'form-data';
 import * as path from 'path';
-import {
-  createTasks,
-  fileReplacer,
-  getInstanceId,
-  Select,
-  Zip,
-} from './util';
-import type { ApiClient } from '@becomes/cms-cloud-client/types';
+import { createTasks, fileReplacer, getInstanceId, Select, Zip } from './util';
+import type {
+  ApiClient,
+  InstanceProtected,
+} from '@becomes/cms-cloud-client/types';
 import { login } from './login';
 import { prompt } from 'inquirer';
 import { ChildProcess } from '@banez/child_process';
 import { createFS } from '@banez/fs';
 import { StringUtility } from '@banez/string-utility';
 import type { Args } from './types';
+import type { Task } from '@banez/npm-tool/types';
+import type { FS } from '@banez/fs/types';
 
 const fs = createFS({
   base: process.cwd(),
 });
 
 export class CMS {
-  static async resolve({args, client}: {args: Args, client: ApiClient}): Promise<void> {
+  private static replaceCloudComments(data: string): string {
+    return data
+      .replace(/\/\/ ----%GLOBAL_START%----/g, '')
+      .replace(/\/\/ ----%GLOBAL_END%----/g, '')
+      .replace(/\/\*----%PUBLIC_START%----\*\//g, '')
+      .replace(/\/\*----%PUBLIC_END%----\*\//g, '')
+      .replace(/\/\/ ----%CODE_START%----/g, '')
+      .replace(/\/\/ ----%CODE_END%----/g, '')
+      .replace(/\/\*----%CONFIG_METHOD_START%----\*\//g, '')
+      .replace(/\/\*----%CONFIG_METHOD_END%----\*\//g, '')
+      .replace(/\/\*----%CONFIG_SCOPE_START%----\*\//g, '')
+      .replace(/\/\*----%CONFIG_SCOPE_END%----\*\//g, '')
+      .replace(/\/\*----%MAIN_START%----\*\//g, '')
+      .replace(/\/\*----%MAIN_END%----\*\//g, '')
+      .replace(/\/\*----%CRON_MIN_START%----\*\//g, '')
+      .replace(/\/\*----%CRON_MIN_END%----\*\//g, '')
+      .replace(/\/\*----%CRON_HOUR_START%----\*\//g, '')
+      .replace(/\/\*----%CRON_HOUR_END%----\*\//g, '')
+      .replace(/\/\*----%CRON_DOM_START%----\*\//g, '')
+      .replace(/\/\*----%CRON_DOM_END%----\*\//g, '')
+      .replace(/\/\*----%CRON_MON_START%----\*\//g, '')
+      .replace(/\/\*----%CRON_MON_END%----\*\//g, '')
+      .replace(/\/\*----%CRON_DOW_START%----\*\//g, '')
+      .replace(/\/\*----%CRON_DOW_END%----\*\//g, '');
+  }
+
+  private static pullTasks(
+    instance: InstanceProtected,
+    repoFS: FS,
+    client: ApiClient,
+  ): Task[] {
+    const localFilesMessage = [
+      '/**',
+      ' * IMPORTANT: This file comes from BCMS Cloud UI.',
+      ' * If you want to edit this function do it from the',
+      ' * Cloud UI because any changes to this file locally',
+      ' * will not take place in the Cloud.',
+      ' */',
+      '',
+    ].join('\n');
+    return [
+      {
+        title: 'Save functions',
+        task: async () => {
+          for (let i = 0; i < instance.functions.length; i++) {
+            const item = instance.functions[i];
+            await repoFS.save(
+              ['src', 'functions', '__' + item.name + '.js'],
+              localFilesMessage +
+                CMS.replaceCloudComments(
+                  Buffer.from(item.code, 'base64').toString(),
+                ),
+            );
+          }
+        },
+      },
+      {
+        title: 'Save jobs',
+        task: async () => {
+          for (let i = 0; i < instance.jobs.length; i++) {
+            const item = instance.jobs[i];
+            await repoFS.save(
+              ['src', 'jobs', '__' + item.name + '.js'],
+              localFilesMessage +
+                CMS.replaceCloudComments(
+                  Buffer.from(item.code, 'base64').toString(),
+                ),
+            );
+          }
+        },
+      },
+      {
+        title: 'Save events',
+        task: async () => {
+          for (let i = 0; i < instance.events.length; i++) {
+            const item = instance.events[i];
+            await repoFS.save(
+              ['src', 'events', '__' + item.name + '.js'],
+              localFilesMessage +
+                CMS.replaceCloudComments(
+                  Buffer.from(item.code, 'base64').toString(),
+                ),
+            );
+          }
+        },
+      },
+      {
+        title: 'Save plugins',
+        task: async () => {
+          const bcmsConfig = await repoFS.readString('bcms.config.js');
+          const rawPluginList = StringUtility.textBetween(
+            bcmsConfig,
+            'plugins: [',
+            ']',
+          );
+          const inject = !bcmsConfig.includes('plugins: [');
+          const pluginList = rawPluginList
+            .split(',')
+            .map((e) =>
+              e
+                .replace(/ /g, '')
+                .replace(/\n/g, '')
+                .replace(/\r/g, '')
+                .replace(/\t/g, '')
+                .replace(/'/g, '')
+                .replace(/"/g, ''),
+            )
+            .filter((e) => e);
+          for (let i = 0; i < instance.plugins.length; i++) {
+            const item = instance.plugins[i];
+            const pluginData = await client.media.get.instancePlugin({
+              orgId: instance.org.id,
+              instanceId: instance._id,
+              pluginId: item.id,
+            });
+            await repoFS.save(['plugins', item.id], pluginData);
+            if (!pluginList.find((e) => e === item.tag)) {
+              pluginList.push(item.tag);
+            }
+          }
+          await repoFS.save(
+            'bcms.config.js',
+            inject
+              ? bcmsConfig.replace(
+                  'module.exports = createBcmsConfig({',
+                  `module.exports = createBcmsConfig({\n  plugins: [${pluginList
+                    .map((e) => `'${e}'`)
+                    .join(', ')}],`,
+                )
+              : bcmsConfig.replace(
+                  `plugins: [${rawPluginList}`,
+                  'plugins: [' + pluginList.map((e) => `'${e}'`).join(', '),
+                ),
+          );
+        },
+      },
+      {
+        title: 'Add Cloud files to ignore',
+        task: async () => {
+          const startComment = '// ---- BCMS Cloud files - start ----\n';
+          const endComment = '\n// ---- BCMS Cloud files - end ----';
+          const ignoreFiles = [
+            instance.functions
+              .map((e) => `src/functions/__${e.name}.js`)
+              .join('\n'),
+            instance.events.map((e) => `src/events/__${e.name}.js`).join('\n'),
+            instance.jobs.map((e) => `src/jobs/__${e.name}.js`).join('\n'),
+          ].join('\n');
+          let eslintIgnore = await repoFS.readString('.eslintignore');
+          let gitIgnore = await repoFS.readString('.gitignore');
+          const esInject = StringUtility.textBetween(
+            eslintIgnore,
+            startComment,
+            endComment,
+          );
+          if (esInject) {
+            eslintIgnore = eslintIgnore.replace(esInject, ignoreFiles);
+          } else {
+            eslintIgnore +=
+              `\n${startComment}` + ignoreFiles + `${endComment}\n`;
+          }
+          const gitInject = StringUtility.textBetween(
+            gitIgnore,
+            startComment,
+            endComment,
+          );
+          if (gitInject) {
+            gitIgnore = gitIgnore.replace(gitInject, ignoreFiles);
+          } else {
+            gitIgnore += `\n${startComment}` + ignoreFiles + `${endComment}\n`;
+          }
+          await repoFS.save('.eslintignore', eslintIgnore);
+          await repoFS.save('.gitignore', gitIgnore);
+        },
+      },
+    ];
+  }
+
+  static async resolve({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
     if (args.cms === 'bundle') {
       await this.bundle();
     } else if (args.cms === 'deploy') {
-      await this.deploy({args, client});
+      await this.deploy({ args, client });
     } else if (args.cms === 'clone') {
-      await this.clone({args, client})
+      await this.clone({ args, client });
     }
   }
+
   static async bundle(): Promise<void> {
     const tasks = createTasks([
       {
@@ -134,6 +318,7 @@ export class CMS {
     ]);
     await tasks.run();
   }
+
   static async deploy({
     args,
     client,
@@ -176,13 +361,14 @@ export class CMS {
       await client.media.set.instanceZip({
         orgId: instance.org.id,
         instanceId,
-        formData: formData as any,
+        formData: formData as never,
         onProgress(progress) {
           console.log(`Uploaded ${progress}%`);
         },
       });
     }
   }
+
   static async clone({
     args,
     client,
@@ -196,6 +382,10 @@ export class CMS {
     const { org, instance } = await Select.orgAndInstance({ client });
     const repoName = `${org.nameEncoded}-${instance.nameEncoded}`;
     const repoPath = path.join(process.cwd(), repoName);
+    const repoFS = createFS({
+      base: path.join(process.cwd(), repoName),
+    });
+
     const tasks = createTasks([
       {
         title: 'Clone base GitHub repository',
@@ -210,6 +400,8 @@ export class CMS {
             stdio: 'inherit',
             cwd: repoPath,
           });
+          await repoFS.mkdir('uploads');
+          await repoFS.save(['db', 'bcms.fsdb.json'], '{}')
         },
       },
       {
@@ -258,6 +450,7 @@ export class CMS {
                 code: 'local',
                 local: true,
                 instanceId: instance._id,
+                orgId: instance.org.id,
               },
               null,
               '  ',
@@ -265,7 +458,31 @@ export class CMS {
           );
         },
       },
+      ...CMS.pullTasks(instance, repoFS, client),
     ]);
     await tasks.run();
+  }
+
+  static async pull({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    if (!(await client.isLoggedIn())) {
+      await login({ args, client });
+    }
+    const repoFS = createFS({
+      base: process.cwd(),
+    });
+    const shimJson = JSON.parse(await repoFS.readString('shim.json'));
+    const instance = await client.instance.get({
+      orgId: shimJson.orgId,
+      instanceId: shimJson.instanceId,
+    });
+    if (instance) {
+      await createTasks(CMS.pullTasks(instance, repoFS, client)).run();
+    }
   }
 }
