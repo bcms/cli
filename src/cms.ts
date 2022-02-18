@@ -401,7 +401,16 @@ export class CMS {
             cwd: repoPath,
           });
           await repoFS.mkdir('uploads');
-          await repoFS.save(['db', 'bcms.fsdb.json'], '{}')
+          await repoFS.save(['db', 'bcms.fsdb.json'], '{}');
+        },
+      },
+      {
+        title: 'Install dependencies',
+        task: async () => {
+          await ChildProcess.spawn('npm', ['i'], {
+            stdio: 'inherit',
+            cwd: repoPath,
+          });
         },
       },
       {
