@@ -13,6 +13,7 @@ import {
   createTerminalTitle,
   Terminal,
 } from './terminal';
+import { StringUtility } from '@becomes/purple-cheetah';
 
 const fs = createFS({
   base: process.cwd(),
@@ -338,7 +339,8 @@ export class Plugin {
         },
       },
     ]);
-    const repoPath = path.join(process.cwd(), answer.name);
+    const repoNameFormatted = StringUtility.toSlug(answer.name);
+    const repoPath = path.join(process.cwd(), repoNameFormatted);
     const repoFS = createFS({
       base: repoPath,
     });
@@ -349,7 +351,7 @@ export class Plugin {
           await ChildProcess.spawn('git', [
             'clone',
             'https://github.com/becomesco/cms-plugin-starter',
-            answer.name,
+            repoNameFormatted,
           ]);
           // TODO: Remove this line when ready for production
           await ChildProcess.spawn('git', ['checkout', 'next'], {
