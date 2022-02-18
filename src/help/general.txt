@@ -6,6 +6,7 @@
   commands:
     deploy  - deploy plugin to a BCMS instance
     bundle  - prepare plugin for deployment
+    create  - create new plugin project
 
 --function <name> <options>
   options:

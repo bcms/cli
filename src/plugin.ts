@@ -39,8 +39,20 @@ export class Plugin {
       });
       Terminal.render();
       await this.deploy({ args, client });
+    } else if (args.plugin === 'create') {
+      Terminal.pushComponent({
+        name: 'title',
+        component: createTerminalTitle({
+          state: {
+            text: 'Plugin create',
+          },
+        }),
+      });
+      Terminal.render();
+      await this.create();
     }
   }
+
   static async bundle(): Promise<void> {
     let pluginName = '';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,7 +67,11 @@ export class Plugin {
       {
         title: 'Build Vue app',
         async task() {
-          await ChildProcess.spawn('npm', ['run', 'build:vue']);
+          await ChildProcess.spawn('vue-cli-service', [
+            'build',
+            '--dest',
+            'dist/ui',
+          ]);
           await fse.move(
             path.join(process.cwd(), 'dist', 'ui', 'index.html'),
             path.join(process.cwd(), 'dist', 'ui', '_index.html'),
@@ -117,7 +133,10 @@ export class Plugin {
       {
         title: 'Build backend',
         async task() {
-          await ChildProcess.spawn('npm', ['run', 'build:backend']);
+          await ChildProcess.spawn('tsc', [
+            '--project',
+            'tsconfig.backend.json',
+          ]);
         },
       },
       {
@@ -208,6 +227,7 @@ export class Plugin {
     ]);
     await tasks.run();
   }
+
   static async deploy({
     args,
     client,
@@ -302,5 +322,62 @@ export class Plugin {
         Terminal.render();
       },
     });
+  }
+
+  static async create(): Promise<void> {
+    const answer = await prompt<{ name: string }>([
+      {
+        name: 'name',
+        type: 'input',
+        message: 'Plugin name',
+        validate(input) {
+          if (!input) {
+            return false;
+          }
+          return true;
+        },
+      },
+    ]);
+    const repoPath = path.join(process.cwd(), answer.name);
+    const repoFS = createFS({
+      base: repoPath,
+    });
+    await createTasks([
+      {
+        title: 'Clone GitHub repository',
+        task: async () => {
+          await ChildProcess.spawn('git', [
+            'clone',
+            'https://github.com/becomesco/cms-plugin-starter',
+            answer.name,
+          ]);
+          // TODO: Remove this line when ready for production
+          await ChildProcess.spawn('git', ['checkout', 'next'], {
+            stdio: 'inherit',
+            cwd: repoPath,
+          });
+          await repoFS.mkdir('uploads');
+          await repoFS.save(['db', 'bcms.fsdb.json'], '{}');
+          await repoFS.mkdir('logs');
+          const pluginConfig = JSON.parse(
+            await repoFS.readString('bcms-plugin.config.json'),
+          );
+          pluginConfig.pluginName = answer.name;
+          await repoFS.save(
+            'bcms-plugin.config.json',
+            JSON.stringify(pluginConfig, null, '  '),
+          );
+        },
+      },
+      {
+        title: 'Install dependencies',
+        task: async () => {
+          await ChildProcess.spawn('npm', ['i'], {
+            stdio: 'inherit',
+            cwd: repoPath,
+          });
+        },
+      },
+    ]).run();
   }
 }
