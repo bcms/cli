@@ -10,7 +10,10 @@ export class Most {
       await most.media.pull();
     } else if (args.most === 'pull-types') {
       await most.typeConverter.pull();
+    } else if (args.most === 'pull-templates') {
+      await most.template.pull();
     } else if (args.most === 'all') {
+      await most.template.pull();
       await most.content.pull();
       await most.media.pull();
       await most.typeConverter.pull();
