@@ -215,7 +215,7 @@ export class Shim {
               [
                 '@reboot docker start bcms-shim',
                 '* * * * * docker start bcms-shim',
-                '* * * * * bcms --shim-update',
+                '* * * * * bcms --shim update',
               ].join('\n'),
             );
           } else {
