@@ -18,6 +18,8 @@
 /bcms.config.js
 /bcms
 /static
+/__bcms_tmp
+/bcms_backup_*
 
 # Logs
 /log
