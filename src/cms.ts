@@ -1,6 +1,14 @@
 import * as FormData from 'form-data';
 import * as path from 'path';
-import { createTasks, fileReplacer, getInstanceId, Select, Zip } from './util';
+import {
+  createSdk3,
+  createTasks,
+  fileReplacer,
+  getInstanceId,
+  MediaUtil,
+  Select,
+  Zip,
+} from './util';
 import type {
   ApiClient,
   InstanceProtected,
@@ -13,6 +21,14 @@ import { StringUtility } from '@banez/string-utility';
 import type { Args } from './types';
 import type { Task } from '@banez/npm-tool/types';
 import type { FS } from '@banez/fs/types';
+import Axios from 'axios';
+import {
+  createTerminalList,
+  createTerminalProgressBar,
+  createTerminalTitle,
+  Terminal,
+} from './terminal';
+import { BCMSLanguage, BCMSMedia, BCMSMediaType } from '@becomes/cms-sdk/types';
 
 const fs = createFS({
   base: process.cwd(),
@@ -210,7 +226,401 @@ export class CMS {
       await this.deploy({ args, client });
     } else if (args.cms === 'clone') {
       await this.clone({ args, client });
+    } else if (args.cms === 'backup') {
+      await this.backup({ client, args });
+    } else if (args.cms === 'restore') {
+      await this.restore({ client, args });
     }
+  }
+
+  static async restore({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    const titleComponent = createTerminalTitle({
+      state: {
+        text: 'BCMS Backup Restoring',
+      },
+    });
+    Terminal.pushComponent({
+      name: 'title',
+      component: titleComponent,
+    });
+    if (!(await client.isLoggedIn())) {
+      await login({ args, client });
+    }
+    Terminal.render();
+    const backupList = (await fs.readdir('')).filter(
+      (e) => e.startsWith('bcms_backup_') && e.endsWith('.zip'),
+    );
+    if (backupList.length === 0) {
+      throw Error('There are no backup files in current directory.');
+    }
+    const backupSelect = await prompt<{ file: string }>([
+      {
+        type: 'list',
+        message: 'Select a backup file',
+        name: 'file',
+        choices: backupList,
+      },
+    ]);
+    const tmpFs = createFS({
+      base: path.join(process.cwd(), '__bcms_tmp'),
+    });
+    // Unzipping
+    {
+      Zip.unzip({
+        location: path.join(process.cwd(), '__bcms_tmp'),
+        buffer: await fs.read(backupSelect.file),
+      });
+      const unzipFiles = await tmpFs.readdir('');
+      if (!unzipFiles.includes('db') || !unzipFiles.includes('uploads.zip')) {
+        await tmpFs.deleteDir('');
+        throw Error('Invalid backup format.');
+      }
+      Zip.unzip({
+        location: path.join(process.cwd(), '__bcms_tmp'),
+        buffer: await tmpFs.read('uploads.zip'),
+      });
+    }
+    const { org, instance } = await Select.orgAndInstance({ client });
+    titleComponent.update({
+      state: {
+        text: `BCMS Backup - ${org.name}, ${instance.name}`,
+      },
+    });
+    Terminal.render();
+    const origin = 'https://' + instance.domains[0];
+    // const origin = 'http://localhost:8080';
+    const sdk3 = createSdk3({
+      origin,
+    });
+    const otp = await client.user.getOtp();
+    await sdk3.shim.verify.otp(otp);
+    const restoreOptions = [
+      'All',
+      'Templates',
+      'Groups',
+      'Widgets',
+      'Api Keys',
+      'Languages',
+      'Entires',
+      'Statuses',
+      'Media',
+    ];
+    const whatToRestore = await prompt<{ answer: string[] }>([
+      {
+        message: 'What would you like to restore?',
+        type: 'checkbox',
+        choices: restoreOptions,
+        name: 'answer',
+      },
+    ]);
+    const { confirm } = await prompt<{ confirm: boolean }>([
+      {
+        message: `Are you sure you want to restore data to: ${org.name}, ${instance.name}?`,
+        type: 'confirm',
+        name: 'confirm',
+      },
+    ]);
+    if (confirm) {
+      let toRestore: string[] = [];
+      if (whatToRestore.answer.includes('All')) {
+        toRestore = [...restoreOptions.slice(1), 'ID Counters'];
+      } else {
+        toRestore = whatToRestore.answer;
+      }
+      const terminalList: {
+        [name: string]: string;
+      } = {};
+      for (let i = 0; i < toRestore.length; i++) {
+        const restore = toRestore[i];
+        terminalList[restore] = '♺';
+      }
+      const listComponent = createTerminalList({
+        state: {
+          items: Object.keys(terminalList).map((e) => {
+            return {
+              text: `${e} ${terminalList[e]}`,
+            };
+          }),
+        },
+      });
+      Terminal.pushComponent({
+        name: 'list',
+        component: listComponent,
+      });
+      Terminal.render();
+      const dbFiles = await tmpFs.readdir(['db']);
+      for (let i = 0; i < toRestore.length; i++) {
+        const restore = toRestore[i];
+        switch (restore) {
+          case 'Templates':
+            {
+              const dbFile = dbFiles.find((e) => e.endsWith('_templates.json'));
+              if (dbFile) {
+                const items = JSON.parse(
+                  await tmpFs.readString(['db', dbFile]),
+                );
+                await sdk3.backup.restoreEntities({
+                  type: 'template',
+                  items,
+                });
+              }
+            }
+            break;
+          case 'Groups':
+            {
+              const dbFile = dbFiles.find((e) => e.endsWith('_groups.json'));
+              if (dbFile) {
+                const items = JSON.parse(
+                  await tmpFs.readString(['db', dbFile]),
+                );
+                await sdk3.backup.restoreEntities({
+                  type: 'group',
+                  items,
+                });
+              }
+            }
+            break;
+          case 'Widgets':
+            {
+              const dbFile = dbFiles.find((e) => e.endsWith('_widgets.json'));
+              if (dbFile) {
+                const items = JSON.parse(
+                  await tmpFs.readString(['db', dbFile]),
+                );
+                await sdk3.backup.restoreEntities({
+                  type: 'widget',
+                  items,
+                });
+              }
+            }
+            break;
+          case 'ID Counters':
+            {
+              const dbFile = dbFiles.find((e) =>
+                e.endsWith('_id_counters.json'),
+              );
+              if (dbFile) {
+                const items = JSON.parse(
+                  await tmpFs.readString(['db', dbFile]),
+                );
+                await sdk3.backup.restoreEntities({
+                  type: 'idc',
+                  items,
+                });
+              }
+            }
+            break;
+          case 'Media':
+            {
+              const dbFile = dbFiles.find((e) => e.endsWith('_medias.json'));
+              if (dbFile) {
+                const items = JSON.parse(
+                  await tmpFs.readString(['db', dbFile]),
+                ) as BCMSMedia[];
+                await sdk3.backup.restoreEntities({
+                  type: 'media',
+                  items,
+                });
+                let progressName = 'Media';
+                const progress = createTerminalProgressBar({
+                  state: {
+                    name: progressName,
+                    progress: 0,
+                  },
+                });
+                Terminal.pushComponent({
+                  name: 'progress',
+                  component: progress,
+                });
+                const fileItems = items.filter(
+                  (e) => e.type !== BCMSMediaType.DIR,
+                );
+                for (let k = 0; k < fileItems.length; k++) {
+                  const item = fileItems[k];
+                  if (item.type !== BCMSMediaType.DIR) {
+                    progressName = item.name;
+                    progress.update({
+                      state: {
+                        name: progressName,
+                        progress: (100 / fileItems.length) * k,
+                      },
+                    });
+                    Terminal.render();
+                    const pathToFile = await MediaUtil.v3.getPath({
+                      media: item as never,
+                      allMedia: items as never[],
+                    });
+                    if (
+                      await tmpFs.exist(
+                        ['uploads', ...pathToFile.split('/')],
+                        true,
+                      )
+                    ) {
+                      const buffer = await tmpFs.read([
+                        'uploads',
+                        ...pathToFile.split('/'),
+                      ]);
+                      await sdk3.backup.restoreMediaFile({
+                        file: buffer,
+                        name: item.name,
+                        id: item._id,
+                      });
+                      // await new Promise<void>((resolve) => {
+                      //   setTimeout(() => resolve(), 500);
+                      // });
+                    }
+                  }
+                }
+              }
+            }
+            break;
+          case 'Api Keys':
+            {
+              const dbFile = dbFiles.find((e) => e.endsWith('_api_keys.json'));
+              if (dbFile) {
+                const items = JSON.parse(
+                  await tmpFs.readString(['db', dbFile]),
+                );
+                await sdk3.backup.restoreEntities({
+                  type: 'apiKey',
+                  items,
+                });
+              }
+            }
+            break;
+          case 'Languages':
+            {
+              const dbFile = dbFiles.find((e) => e.endsWith('_languages.json'));
+              if (dbFile) {
+                const items = (
+                  JSON.parse(
+                    await tmpFs.readString(['db', dbFile]),
+                  ) as BCMSLanguage[]
+                ).filter((e) => e.code !== 'en');
+                await sdk3.backup.restoreEntities({
+                  type: 'language',
+                  items,
+                });
+              }
+            }
+            break;
+          case 'Entires':
+            {
+              const dbFile = dbFiles.find((e) => e.endsWith('_entries.json'));
+              if (dbFile) {
+                const items = JSON.parse(
+                  await tmpFs.readString(['db', dbFile]),
+                );
+                await sdk3.backup.restoreEntities({
+                  type: 'entry',
+                  items,
+                });
+              }
+            }
+            break;
+          case 'Statuses':
+            {
+              const dbFile = dbFiles.find((e) => e.endsWith('_statuses.json'));
+              if (dbFile) {
+                const items = JSON.parse(
+                  await tmpFs.readString(['db', dbFile]),
+                );
+                await sdk3.backup.restoreEntities({
+                  type: 'status',
+                  items,
+                });
+              }
+            }
+            break;
+        }
+        terminalList[restore] = '✓';
+        listComponent.update({
+          state: {
+            items: Object.keys(terminalList).map((e) => {
+              return {
+                text: `${e} ${terminalList[e]}`,
+              };
+            }),
+          },
+        });
+        Terminal.render();
+      }
+    }
+    await sdk3.user.logout();
+    // await tmpFs.deleteDir('');
+  }
+
+  static async backup({
+    client,
+    args,
+  }: {
+    client: ApiClient;
+    args: Args;
+  }): Promise<void> {
+    const titleComponent = createTerminalTitle({
+      state: {
+        text: 'BCMS Backup',
+      },
+    });
+    Terminal.pushComponent({
+      name: 'title',
+      component: titleComponent,
+    });
+    if (!(await client.isLoggedIn())) {
+      await login({ args, client });
+    }
+    Terminal.render();
+    const { org, instance } = await Select.orgAndInstance({ client });
+    titleComponent.update({
+      state: {
+        text: `BCMS Backup - ${org.name}, ${instance.name}`,
+      },
+    });
+    // const origin = 'https://' + instance.domains[0];
+    const origin = 'http://localhost:8080';
+    const sdk3 = createSdk3({
+      origin,
+    });
+    const otp = await client.user.getOtp();
+    await sdk3.shim.verify.otp(otp);
+    const hash = await sdk3.backup.create({
+      media: true,
+    });
+    const progress = createTerminalProgressBar({
+      state: {
+        name: 'Downloading backup file',
+        progress: 0,
+      },
+    });
+    Terminal.pushComponent({
+      component: progress,
+      name: 'progress',
+    });
+    Terminal.render();
+    const res = await Axios({
+      url: `${origin}/api/backup/${hash}`,
+      method: 'GET',
+      responseType: 'arraybuffer',
+
+      onDownloadProgress(event) {
+        progress.update({
+          state: {
+            name: progress.state ? progress.state.name : '',
+            progress: progress.state ? progress.state.progress + 1 : 0,
+          },
+        });
+        Terminal.render();
+        console.log(event);
+      },
+    });
+    await fs.save(`bcms_backup_${new Date().toISOString()}.zip`, res.data);
+    await sdk3.user.logout();
   }
 
   static async bundle(): Promise<void> {

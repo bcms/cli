@@ -3,7 +3,7 @@ import { BCMSClient as BCMSClientV2 } from '../bcms-client-v2';
 import { v4 as uuidv4 } from 'uuid';
 import { createFS } from '@banez/fs';
 import { ChildProcess } from '@banez/child_process';
-import { getCmsInfo, MediaUtil } from '../util';
+import { getCmsInfo, MediaUtil, Zip } from '../util';
 import type { ChildProcessOnChunkHelperOutput } from '@banez/child_process/types';
 import { prompt } from 'inquirer';
 import {
@@ -61,6 +61,7 @@ import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import type { FS } from '@banez/fs/types';
 import { ObjectUtility } from '@banez/object-utility';
 import { ObjectUtilityError } from '@banez/object-utility/types';
+import { CMS } from '../cms';
 
 function nodeToText({ node }: { node: EntryV3ContentNode }) {
   let output = '';
@@ -158,6 +159,7 @@ export class Migration {
   static async resolve({
     args,
     rootFs,
+    client,
   }: {
     args: Args;
     client: ApiClient;
@@ -219,6 +221,8 @@ export class Migration {
     } else if (args.version === '3') {
       if (args.migration === 'create-fsdb') {
         await this.push.v3FSDB({ args, migrationConfig });
+      } else if (args.migration === 'push') {
+        await this.push.v3Push({ args, migrationConfig, client });
       }
     }
   }
@@ -989,7 +993,7 @@ export class Migration {
               {
                 const items = dbData as GroupV2[];
                 const output: GroupV3[] = [];
-                idc.groups.count = items.length;
+                idc.groups.count = items.length + 1;
 
                 for (let j = 0; j < items.length; j++) {
                   const item = items[j];
@@ -1021,7 +1025,7 @@ export class Migration {
               {
                 const items = dbData as TemplateV2[];
                 const output: TemplateV3[] = [];
-                idc.templates.count = items.length;
+                idc.templates.count = items.length + 1;
 
                 for (let j = 0; j < items.length; j++) {
                   const item = items[j];
@@ -1055,7 +1059,7 @@ export class Migration {
               {
                 const items = dbData as WidgetV2[];
                 const output: WidgetV3[] = [];
-                idc.widgets.count = items.length;
+                idc.widgets.count = items.length + 1;
 
                 for (let j = 0; j < items.length; j++) {
                   const item = items[j];
@@ -1091,7 +1095,7 @@ export class Migration {
               {
                 const items = dbData as EntryV2[];
                 const output: EntryV3[] = [];
-                idc.entries.count = items.length;
+                idc.entries.count = items.length + 1;
 
                 for (let j = 0; j < items.length; j++) {
                   const item = items[j];
@@ -1422,6 +1426,11 @@ export class Migration {
       args: Args;
       migrationConfig: MigrationConfig;
     }): Promise<void>;
+    v3Push(data: {
+      args: Args;
+      migrationConfig: MigrationConfig;
+      client: ApiClient;
+    }): Promise<void>;
   } {
     return {
       async v3FSDB({ args, migrationConfig }) {
@@ -1514,6 +1523,40 @@ export class Migration {
           updateTerminalList();
         }
         await inputFs.save(`${prfx}.fsdb.json`, JSON.stringify(fsdbOutput));
+      },
+      async v3Push({ args, client }) {
+        console.log('\n\nCreating archive. Please wait ...');
+        await Migration.fs.mkdir('tmp');
+        await Migration.fs.mkdir(['tmp', 'db']);
+        await Migration.fs.mkdir(['tmp', 'uploads']);
+        const dbFiles = (await Migration.fs.readdir('v3_data')).filter((e) =>
+          e.endsWith('.json'),
+        );
+        for (let i = 0; i < dbFiles.length; i++) {
+          const dbFile = dbFiles[i];
+          await Migration.fs.copy(['v3_data', dbFile], ['tmp', 'db', dbFile]);
+        }
+        await Migration.fs.copy(
+          ['v3_data', 'uploads'],
+          ['tmp', 'uploads', 'uploads'],
+        );
+        await Migration.fs.save(
+          ['tmp', 'uploads.zip'],
+          await Zip.create({
+            location: path.join(process.cwd(), 'migration', 'tmp', 'uploads'),
+          }),
+        );
+        await Migration.fs.deleteDir(['tmp', 'uploads']);
+        const backupFileName = `bcms_backup_${new Date().toISOString()}.zip`;
+        await Migration.fs.save(
+          ['..', backupFileName],
+          await Zip.create({
+            location: path.join(process.cwd(), 'migration', 'tmp'),
+          }),
+        );
+        await Migration.fs.deleteDir('tmp');
+        await CMS.restore({ args, client });
+        await Migration.fs.deleteFile(['..', backupFileName]);
       },
     };
   }

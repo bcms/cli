@@ -12,7 +12,7 @@ export class Select {
   }> {
     const orgs = await client.org.getAll();
     const instances = await client.instance.getAll();
-    const promptResult = await prompt<{ orgId: string; instanceId: string }>([
+    const orgResult = await prompt<{ orgId: string }>([
       {
         name: 'orgId',
         type: 'list',
@@ -24,28 +24,30 @@ export class Select {
         }),
         message: 'Select an organization:',
       },
+    ]);
+    const instResult = await prompt<{ instanceId: string }>([
       {
         name: 'instanceId',
         type: 'list',
-        choices: instances.map((inst) => {
-          return {
-            name: inst.name,
-            value: inst._id,
-          };
-        }),
+        choices: instances
+          .filter((inst) => inst.org.id === orgResult.orgId)
+          .map((inst) => {
+            return {
+              name: inst.name,
+              value: inst._id,
+            };
+          }),
         message: 'Select an instance:',
       },
     ]);
-    const org = orgs.find((e) => e._id === promptResult.orgId);
+    const org = orgs.find((e) => e._id === orgResult.orgId);
     if (!org) {
-      throw Error(
-        `Organization with ID "${promptResult.orgId}" does not exist.`,
-      );
+      throw Error(`Organization with ID "${orgResult.orgId}" does not exist.`);
     }
-    const instance = instances.find((e) => e._id === promptResult.instanceId);
+    const instance = instances.find((e) => e._id === instResult.instanceId);
     if (!instance) {
       throw Error(
-        `Instance with ID "${promptResult.instanceId}" does not exist.`,
+        `Instance with ID "${instResult.instanceId}" does not exist.`,
       );
     }
     return { org, instance };
