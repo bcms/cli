@@ -26,6 +26,7 @@
     deploy  - deploy the project to BCMS Cloud
     clone   - create starter project and get instance data if available
     pull    - pull functions, events, jobs and plugins for current instance
+    backup  - create local backup of the BCMS
 
 --instance <id> <options>
   options:
@@ -36,6 +37,7 @@
     pull         - pull data from existing BCMS
     transform    - transform data from 1 version to next
     create-fsdb  - create valid FSDB database with current data
+    push         - Restore data to target BCMS
   options:
     --version - migration version (can be 2 or 3)
 
