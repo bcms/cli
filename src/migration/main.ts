@@ -5,6 +5,9 @@ import { createFS } from '@banez/fs';
 import { ChildProcess } from '@banez/child_process';
 import { getCmsInfo, MediaUtil, Zip } from '../util';
 import type { ChildProcessOnChunkHelperOutput } from '@banez/child_process/types';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const htop = require('html-to-prosemirror');
+const htopRenderer = new htop.Renderer();
 import { prompt } from 'inquirer';
 import {
   ApiKeyV2,
@@ -50,6 +53,8 @@ import {
   WidgetV3,
   Args,
   MigrationConfigSchema,
+  PropV3ValueEntryPointer,
+  PropV3ValueRichTextData,
 } from '../types';
 import {
   Terminal,
@@ -338,11 +343,13 @@ export class Migration {
           } else if (inputProp.type === PropV2Type.ENTRY_POINTER) {
             outputProp.type = PropV3Type.ENTRY_POINTER;
             const value = inputProp.value as PropV2EntryPointer;
-            outputProp.defaultData = {
-              templateId: value.templateId,
-              entryIds: value.entryIds,
-              displayProp: 'title',
-            } as PropV3EntryPointerData;
+            outputProp.defaultData = [
+              {
+                templateId: value.templateId,
+                entryIds: value.entryIds,
+                displayProp: 'title',
+              },
+            ] as PropV3EntryPointerData[];
           } else if (inputProp.type === PropV2Type.ENUMERATION) {
             outputProp.type = PropV3Type.ENUMERATION;
             const value = inputProp.value as PropV2Enum;
@@ -370,6 +377,9 @@ export class Migration {
               }
             }
             outputProp.defaultData = defaultData;
+          } else if (inputProp.type === PropV2Type.RICH_TEXT) {
+            outputProp.type = PropV3Type.RICH_TEXT;
+            outputProp.defaultData = [];
           }
           output.push(outputProp);
         }
@@ -378,6 +388,9 @@ export class Migration {
       async v2Values({ inputProps, schemaProps, prfx }) {
         const outputFs = createFS({
           base: path.join(Migration.basePath, 'v3_data'),
+        });
+        const inputFs = createFS({
+          base: path.join(Migration.basePath, 'v2_data'),
         });
         const outputProps: PropV3Value[] = [];
         for (let i = 0; i < schemaProps.length; i++) {
@@ -398,7 +411,20 @@ export class Migration {
               outputProp.data = inputProp.value as string[];
             } else if (inputProp.type === PropV2Type.ENTRY_POINTER) {
               const inputValue = inputProp.value as PropV2EntryPointer;
-              outputProp.data = inputValue.entryIds;
+              (outputProp.data as PropV3ValueEntryPointer[]) = [];
+              const entries: EntryV2[] = JSON.parse(
+                await inputFs.readString(`${prfx}_entries.json`),
+              );
+              for (let j = 0; j < inputValue.entryIds.length; j++) {
+                const entryId = inputValue.entryIds[j];
+                const entry = entries.find((e) => e._id.$oid === entryId);
+                if (entry) {
+                  (outputProp.data as PropV3ValueEntryPointer[]).push({
+                    tid: entry.templateId,
+                    eid: entry._id.$oid,
+                  });
+                }
+              }
             } else if (inputProp.type === PropV2Type.ENUMERATION) {
               const inputValue = inputProp.value as PropV2Enum;
               outputProp.data = [inputValue.selected || ''];
@@ -447,6 +473,22 @@ export class Migration {
                 }
               }
               outputProp.data = outputData;
+            } else if (inputProp.type === PropV2Type.RICH_TEXT) {
+              const value = inputProp.value as PropV2Quill;
+              (outputProp.data as PropV3ValueRichTextData[]) = [
+                {
+                  nodes: value.text
+                    ? JSON.parse(
+                        JSON.stringify(
+                          htopRenderer.render(value.text).content,
+                        ).replace(
+                          /{"type":"paragraph","content":\[{"type":"hard_break"}\]}/g,
+                          '{"type":"hard_break"}',
+                        ),
+                      )
+                    : [],
+                },
+              ];
             } else {
               pushProp = false;
             }
@@ -463,11 +505,10 @@ export class Migration {
     v2(data: {
       inputProps: PropV2[];
       prfx: string;
-      lng: string;
     }): Promise<EntryV3ContentNode[]>;
     v2OpsToNode(data: {
       ops: PropV2QuillOption[];
-      mainNodeType: EntryV3ContentNodeType;
+      mainNodeType: EntryV3ContentNodeType | 'doc';
     }): EntryV3ContentNode;
     v2OpAttrsToMarks(data: {
       attrs: {
@@ -707,7 +748,7 @@ export class Migration {
       },
       v2OpsToNode({ ops, mainNodeType }) {
         const mainNode: EntryV3ContentNode = {
-          type: mainNodeType,
+          type: mainNodeType as never,
           content: [],
         };
         const mainNodeContent: EntryV3ContentNode[] = [];
@@ -1123,7 +1164,6 @@ export class Migration {
                       const content = item.content[k];
                       const nodes = await Migration.content.v2({
                         inputProps: content.props,
-                        lng: content.lng,
                         prfx: toPrfx,
                       });
                       newContent.push({
@@ -1198,48 +1238,61 @@ export class Migration {
           for (let j = 0; j < allMedia.length; j++) {
             const media = allMedia[j];
 
-            const progressName = `[${j + 1}/${allMedia.length}] ${media.name}`;
-            progressBar.update({
-              state: {
-                name: progressName,
-                progress,
-              },
-            });
-            Terminal.render();
+            try {
+              const progressName = `[${j + 1}/${allMedia.length}] ${
+                media.name
+              }`;
+              progressBar.update({
+                state: {
+                  name: progressName,
+                  progress,
+                },
+              });
+              Terminal.render();
 
-            const pathToMedia = (
-              await MediaUtil.v3.getPath({
-                media,
-                allMedia,
-              })
-            )
-              .substring(1)
-              .split('/');
-            if (
-              media.type !== MediaV3Type.DIR &&
-              !(await inputFs.exist(['uploads', ...pathToMedia], true))
-            ) {
-              mediaToRemove.push(media._id);
-            } else {
-              if (media.type === MediaV3Type.IMG) {
-                await MediaUtil.v3.createImageThumbnail({ media, allMedia });
-                const metadata = await MediaUtil.v3.imageMetadata({
+              const pathToMedia = (
+                await MediaUtil.v3.getPath({
                   media,
                   allMedia,
-                });
-                if (metadata) {
-                  if (metadata.width) {
-                    media.width = metadata.width;
+                })
+              )
+                .substring(1)
+                .split('/');
+              if (
+                media.type !== MediaV3Type.DIR &&
+                !(await inputFs.exist(['uploads', ...pathToMedia], true))
+              ) {
+                mediaToRemove.push(media._id);
+              } else {
+                if (media.type === MediaV3Type.IMG) {
+                  await MediaUtil.v3.createImageThumbnail({
+                    media,
+                    allMedia,
+                  });
+                  const metadata = await MediaUtil.v3.imageMetadata({
+                    media,
+                    allMedia,
+                  });
+                  if (metadata) {
+                    if (metadata.width) {
+                      media.width = metadata.width;
+                    }
+                    if (metadata.height) {
+                      media.height = metadata.height;
+                    }
                   }
-                  if (metadata.height) {
-                    media.height = metadata.height;
-                  }
+                } else if (media.type === MediaV3Type.VID) {
+                  await MediaUtil.v3.createVideoThumbnail({
+                    media,
+                    allMedia,
+                  });
+                } else if (media.type === MediaV3Type.GIF) {
+                  await MediaUtil.v3.createGifThumbnail({ media, allMedia });
                 }
-              } else if (media.type === MediaV3Type.VID) {
-                await MediaUtil.v3.createVideoThumbnail({ media, allMedia });
-              } else if (media.type === MediaV3Type.GIF) {
-                await MediaUtil.v3.createGifThumbnail({ media, allMedia });
               }
+            } catch (error) {
+              console.error({ error, media });
+              throw error;
             }
 
             progress = (100 / allMedia.length) * (j + 1);

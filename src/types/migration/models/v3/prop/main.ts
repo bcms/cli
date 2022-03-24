@@ -1,7 +1,10 @@
 import type { PropV3RichTextData, PropV3ValueRichTextData } from './rich-text';
 import type { PropV3ColorPickerData } from './color-picker';
 import type { PropV3DateData } from './date';
-import type { PropV3EntryPointerData } from './entry-pointer';
+import type {
+  PropV3EntryPointerData,
+  PropV3ValueEntryPointer,
+} from './entry-pointer';
 import type { PropV3EnumData } from './enum';
 import type {
   PropV3GroupPointerData,
@@ -35,7 +38,7 @@ export type PropV3Data =
   | number[]
   | PropV3DateData
   | PropV3EnumData
-  | PropV3EntryPointerData
+  | PropV3EntryPointerData[]
   | PropV3GroupPointerData
   | PropV3MediaData[]
   | PropV3WidgetData
@@ -68,4 +71,5 @@ export type PropV3ValueData =
   | PropV3ValueGroupPointerData
   | PropV3MediaData[]
   | PropV3ValueWidgetData
-  | PropV3ValueRichTextData[];
+  | PropV3ValueRichTextData[]
+  | PropV3ValueEntryPointer[];
