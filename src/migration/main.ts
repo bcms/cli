@@ -479,12 +479,17 @@ export class Migration {
                 {
                   nodes: value.text
                     ? JSON.parse(
-                        JSON.stringify(
-                          htopRenderer.render(value.text).content,
-                        ).replace(
-                          /{"type":"paragraph","content":\[{"type":"hard_break"}\]}/g,
-                          '{"type":"hard_break"}',
-                        ),
+                        JSON.stringify(htopRenderer.render(value.text).content)
+                          .replace(
+                            /{"type":"paragraph","content":\[{"type":"hard_break"}\]}/g,
+                            '{"type":"hard_break"}',
+                          )
+                          .replace(/{"level":"1"}/g, '{"level":1}')
+                          .replace(/{"level":"2"}/g, '{"level":2}')
+                          .replace(/{"level":"3"}/g, '{"level":3}')
+                          .replace(/{"level":"4"}/g, '{"level":4}')
+                          .replace(/{"level":"5"}/g, '{"level":5}')
+                          .replace(/{"level":"6"}/g, '{"level":6}'),
                       )
                     : [],
                 },
@@ -1067,7 +1072,6 @@ export class Migration {
                 const items = dbData as TemplateV2[];
                 const output: TemplateV3[] = [];
                 idc.templates.count = items.length + 1;
-
                 for (let j = 0; j < items.length; j++) {
                   const item = items[j];
                   output.push({
@@ -1203,7 +1207,9 @@ export class Migration {
         await outputFs.save(
           `${toPrfx}_id_counters.json`,
           JSON.stringify(
-            Object.keys(idc).map((e) => idc[e]),
+            Object.keys(idc).map((e) => {
+              return idc[e];
+            }),
             null,
             '  ',
           ),
@@ -1269,16 +1275,24 @@ export class Migration {
                     media,
                     allMedia,
                   });
-                  const metadata = await MediaUtil.v3.imageMetadata({
-                    media,
-                    allMedia,
-                  });
-                  if (metadata) {
-                    if (metadata.width) {
-                      media.width = metadata.width;
-                    }
-                    if (metadata.height) {
-                      media.height = metadata.height;
+                  if (!media.name.endsWith('svg')) {
+                    const metadata = await MediaUtil.v3.imageMetadata({
+                      media,
+                      allMedia,
+                    });
+                    if (metadata) {
+                      if (metadata.width) {
+                        media.width = metadata.width;
+                      } else {
+                        throw Error('No W' + media.name);
+                      }
+                      if (metadata.height) {
+                        media.height = metadata.height;
+                      } else {
+                        throw Error('No H' + media.name);
+                      }
+                    } else {
+                      throw Error('No metadata ' + media.name);
                     }
                   }
                 } else if (media.type === MediaV3Type.VID) {

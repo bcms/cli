@@ -194,23 +194,19 @@ export class MediaUtil {
         }
       },
       async imageMetadata({ media, allMedia }) {
-        try {
-          const pathToMedia = (
-            await MediaUtil.v3.getPath({
-              media,
-              allMedia,
-            })
-          )
-            .substring(1)
-            .split('/');
-          if (await outputFs.exist(pathToMedia, true)) {
-            const image = sharp(await outputFs.read(pathToMedia));
-            return await image.metadata();
-          }
-          return null;
-        } catch (error) {
-          return null;
+        const pathToMedia = (
+          await MediaUtil.v3.getPath({
+            media,
+            allMedia,
+          })
+        )
+          .substring(1)
+          .split('/');
+        if (await outputFs.exist(pathToMedia, true)) {
+          const image = sharp(await outputFs.read(pathToMedia));
+          return await image.metadata();
         }
+        return null;
       },
     };
   }
