@@ -55,6 +55,7 @@ import {
   MigrationConfigSchema,
   PropV3ValueEntryPointer,
   PropV3ValueRichTextData,
+  PropV3ValueMediaData,
 } from '../types';
 import {
   Terminal,
@@ -461,7 +462,7 @@ export class Migration {
                   `${prfx}_medias.json`,
                 ]),
               );
-              const outputData: string[] = [];
+              const outputData: PropV3ValueMediaData[] = [];
               for (let j = 0; j < inputValue.length; j++) {
                 const mediaPath = inputValue[j];
                 const media = allMedia.find(
@@ -469,7 +470,7 @@ export class Migration {
                     `${!e.isInRoot ? `${e.path}/` : ''}${e.name}` === mediaPath,
                 );
                 if (media) {
-                  outputData.push(media._id.$oid);
+                  outputData.push({ _id: media._id.$oid });
                 }
               }
               outputProp.data = outputData;
@@ -478,19 +479,41 @@ export class Migration {
               (outputProp.data as PropV3ValueRichTextData[]) = [
                 {
                   nodes: value.text
-                    ? JSON.parse(
-                        JSON.stringify(htopRenderer.render(value.text).content)
-                          .replace(
-                            /{"type":"paragraph","content":\[{"type":"hard_break"}\]}/g,
-                            '{"type":"hard_break"}',
+                    ? (
+                        JSON.parse(
+                          JSON.stringify(
+                            htopRenderer.render(value.text).content,
                           )
-                          .replace(/{"level":"1"}/g, '{"level":1}')
-                          .replace(/{"level":"2"}/g, '{"level":2}')
-                          .replace(/{"level":"3"}/g, '{"level":3}')
-                          .replace(/{"level":"4"}/g, '{"level":4}')
-                          .replace(/{"level":"5"}/g, '{"level":5}')
-                          .replace(/{"level":"6"}/g, '{"level":6}'),
-                      )
+                            .replace(
+                              /{"type":"paragraph","content":\[{"type":"hard_break"}\]}/g,
+                              '{"type":"hard_break"}',
+                            )
+                            .replace(/{"level":"1"}/g, '{"level":1}')
+                            .replace(/{"level":"2"}/g, '{"level":2}')
+                            .replace(/{"level":"3"}/g, '{"level":3}')
+                            .replace(/{"level":"4"}/g, '{"level":4}')
+                            .replace(/{"level":"5"}/g, '{"level":5}')
+                            .replace(/{"level":"6"}/g, '{"level":6}')
+                            .replace(
+                              /type":"bullet_list"/g,
+                              `type":"${EntryV3ContentNodeType.bulletList}"`,
+                            )
+                            .replace(
+                              /type":"list_item"/g,
+                              `type":"${EntryV3ContentNodeType.listItem}"`,
+                            ),
+                        ) as EntryV3ContentNode[]
+                      ).filter((e) => {
+                        if (
+                          e.type === EntryV3ContentNodeType.heading &&
+                          !e.content?.find(
+                            (t) => t.type === EntryV3ContentNodeType.text,
+                          )
+                        ) {
+                          return false;
+                        }
+                        return true;
+                      })
                     : [],
                 },
               ];

@@ -10,7 +10,7 @@ import type {
   PropV3GroupPointerData,
   PropV3ValueGroupPointerData,
 } from './group-pointer';
-import type { PropV3MediaData } from './media';
+import type { PropV3MediaData, PropV3ValueMediaData } from './media';
 import type { PropV3ValueWidgetData, PropV3WidgetData } from './widget';
 
 // eslint-disable-next-line no-shadow
@@ -69,7 +69,7 @@ export type PropV3ValueData =
   | number[]
   | PropV3DateData
   | PropV3ValueGroupPointerData
-  | PropV3MediaData[]
+  | PropV3ValueMediaData[]
   | PropV3ValueWidgetData
   | PropV3ValueRichTextData[]
   | PropV3ValueEntryPointer[];
