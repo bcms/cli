@@ -56,6 +56,8 @@ import {
   PropV3ValueEntryPointer,
   PropV3ValueRichTextData,
   PropV3ValueMediaData,
+  StatusV2,
+  StatusV3,
 } from '../types';
 import {
   Terminal,
@@ -1223,6 +1225,27 @@ export class Migration {
                 );
               }
               break;
+            case '_statuses': {
+              const items = dbData as StatusV2[];
+              const output: StatusV3[] = [];
+              for (let j = 0; j < items.length; j++) {
+                const item = items[j];
+                output.push({
+                  _id: item._id.$oid,
+                  createdAt: item.createdAt,
+                  updatedAt: item.updatedAt,
+                  label: item.label,
+                  name: item.name,
+                  color: '',
+                  __v: 0,
+                });
+                updateProgress(progressName, items.length, j);
+              }
+              await outputFs.save(
+                `${toPrfx}${Migration.collectionNames.v2v3Map[cName]}.json`,
+                JSON.stringify(output, null, '  '),
+              );
+            }
           }
           terminalListItems[cName].maker = '✓';
           updateTerminalList();
