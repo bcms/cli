@@ -582,8 +582,8 @@ export class CMS {
         text: `BCMS Backup - ${org.name}, ${instance.name}`,
       },
     });
-    // const origin = 'https://' + instance.domains[0];
-    const origin = 'http://localhost:8080';
+    const origin = 'https://' + instance.domains[0];
+    // const origin = 'http://localhost:8080';
     const sdk3 = createSdk3({
       origin,
     });
