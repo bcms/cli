@@ -42,7 +42,7 @@ async function main() {
   if (!args.cloudOrigin) {
     args.cloudOrigin = 'https://cloud.thebcms.com';
   }
-  const storageFilePath = path.join(Config.fsDir, 'cli.db.json');
+  const storageFilePath = path.join(Config.fsDir, 'cli-db.json');
   const storage = createStorage(() => {
     const store: {
       [key: string]: any;
@@ -122,9 +122,12 @@ async function main() {
     await fs.mkdir(Config.fsDir);
   }
   if (!(await fs.exist(storageFilePath, true))) {
+    console.log('HERE', {storageFilePath});
     await fs.save(storageFilePath, '{}');
   }
+    console.log('HERE2', {storageFilePath});
   (storage as any).init(JSON.parse(await fs.readString(storageFilePath)));
+    console.log('HERE3', {storageFilePath});
   const client = createCloudApiClient({
     args,
     storage,

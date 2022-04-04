@@ -23,7 +23,7 @@
   "dependencies": {
     "@banez/child_process": "^1.0.3",
     "@banez/docker": "^1.1.0",
-    "@banez/fs": "^1.0.2",
+    "@banez/fs": "file:fs.tgz",
     "@banez/npm-tool": "^1.1.0",
     "@banez/object-utility": "^1.0.0",
     "@banez/string-utility": "^1.0.1",
