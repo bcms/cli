@@ -122,12 +122,9 @@ async function main() {
     await fs.mkdir(Config.fsDir);
   }
   if (!(await fs.exist(storageFilePath, true))) {
-    console.log('HERE', {storageFilePath});
     await fs.save(storageFilePath, '{}');
   }
-    console.log('HERE2', {storageFilePath});
   (storage as any).init(JSON.parse(await fs.readString(storageFilePath)));
-    console.log('HERE3', {storageFilePath});
   const client = createCloudApiClient({
     args,
     storage,
