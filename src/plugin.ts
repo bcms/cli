@@ -68,11 +68,10 @@ export class Plugin {
       {
         title: 'Build Vue app',
         async task() {
-          await ChildProcess.spawn('vue-cli-service', [
-            'build',
-            '--dest',
-            'dist/ui',
-          ]);
+          await ChildProcess.spawn('npm', ['run', 'build:ui'], {
+            stdio: 'inherit',
+            cwd: process.cwd(),
+          });
           await fse.move(
             path.join(process.cwd(), 'dist', 'ui', 'index.html'),
             path.join(process.cwd(), 'dist', 'ui', '_index.html'),
@@ -134,9 +133,9 @@ export class Plugin {
       {
         title: 'Build backend',
         async task() {
-          await ChildProcess.spawn('tsc', [
-            '--project',
-            'tsconfig.backend.json',
+          await ChildProcess.spawn('npm', [
+            'run',
+            'build:backend',
           ]);
         },
       },
