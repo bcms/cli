@@ -50,7 +50,7 @@ export class Plugin {
         }),
       });
       Terminal.render();
-      await this.create();
+      await this.create({ args, client });
     }
   }
 
@@ -133,10 +133,7 @@ export class Plugin {
       {
         title: 'Build backend',
         async task() {
-          await ChildProcess.spawn('npm', [
-            'run',
-            'build:backend',
-          ]);
+          await ChildProcess.spawn('npm', ['run', 'build:backend']);
         },
       },
       {
@@ -324,61 +321,73 @@ export class Plugin {
     });
   }
 
-  static async create(): Promise<void> {
-    const answer = await prompt<{ name: string }>([
+  static async create(_data: { args: Args; client: ApiClient }): Promise<void> {
+    const answers = await prompt<{ projectName: string }>([
       {
-        name: 'name',
+        name: 'projectName',
+        message: 'Enter a plugin name:',
         type: 'input',
-        message: 'Plugin name',
-        validate(input) {
-          if (!input) {
-            return false;
-          }
-          return true;
-        },
+        default: `My BCMS Plugin`,
       },
     ]);
-    const repoNameFormatted = StringUtility.toSlug(answer.name);
-    const repoPath = path.join(process.cwd(), repoNameFormatted);
-    const repoFS = createFS({
-      base: repoPath,
+    const projectName = answers.projectName;
+    const formattedProjectName = StringUtility.toSlug(projectName);
+    const repoFs = createFS({
+      base: path.join(process.cwd(), formattedProjectName),
     });
     await createTasks([
       {
         title: 'Clone GitHub repository',
         task: async () => {
-          await ChildProcess.spawn('git', [
-            'clone',
-            'https://github.com/becomesco/cms-plugin-starter',
-            repoNameFormatted,
-          ]);
-          // TODO: Remove this line when ready for production
-          await ChildProcess.spawn('git', ['checkout', 'next'], {
-            stdio: 'inherit',
-            cwd: repoPath,
-          });
-          await repoFS.mkdir('uploads');
-          await repoFS.save(['db', 'bcms.fsdb.json'], '{}');
-          await repoFS.mkdir('logs');
-          const pluginConfig = JSON.parse(
-            await repoFS.readString('bcms-plugin.config.json'),
-          );
-          pluginConfig.pluginName = answer.name;
-          await repoFS.save(
-            'bcms-plugin.config.json',
-            JSON.stringify(pluginConfig, null, '  '),
+          await ChildProcess.spawn(
+            'git',
+            [
+              'clone',
+              'https://github.com/becomesco/cms-plugin-starter',
+              formattedProjectName,
+            ],
+            {
+              stdio: 'inherit',
+              cwd: process.cwd(),
+            },
           );
         },
       },
       {
-        title: 'Install dependencies',
+        title: 'Install project dependencies',
         task: async () => {
           await ChildProcess.spawn('npm', ['i'], {
             stdio: 'inherit',
-            cwd: repoPath,
+            cwd: path.join(process.cwd(), formattedProjectName),
           });
         },
       },
+      {
+        title: 'Setup project',
+        task: async () => {
+          await ChildProcess.spawn('npm', ['run', 'setup'], {
+            stdio: 'inherit',
+            cwd: path.join(process.cwd(), formattedProjectName),
+          });
+        },
+      },
+      {
+        title: 'Set plugin name',
+        task: async () => {
+          const pluginJson = JSON.parse(
+            await repoFs.readString('bcms-plugin.config.json'),
+          );
+          pluginJson.pluginName = projectName;
+          await repoFs.save(
+            'bcms-plugin.config.json',
+            JSON.stringify(pluginJson, null, '  '),
+          );
+        },
+      },
     ]).run();
+
+    console.log('\n\n\nDone :)');
+    console.log(`\n\ncd ${formattedProjectName}`);
+    console.log('docker-compose up');
   }
 }
