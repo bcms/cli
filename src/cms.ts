@@ -1,4 +1,3 @@
-import * as FormData from 'form-data';
 import * as path from 'path';
 import {
   createSdk3,
@@ -9,9 +8,13 @@ import {
   Select,
   Zip,
 } from './util';
-import type {
+import {
   ApiClient,
+  InstanceDep,
+  InstanceFJEType,
   InstanceProtected,
+  InstanceUpdateData,
+  Org,
 } from '@becomes/cms-cloud-client/types';
 import { login } from './login';
 import { prompt } from 'inquirer';
@@ -640,91 +643,108 @@ export class CMS {
       {
         title: 'Fix imports',
         async task() {
-          if (await fs.exist(path.join(process.cwd(), 'dist', 'functions'))) {
-            await fileReplacer({
-              basePath: '../src',
-              dirPath: path.join(process.cwd(), 'dist', 'functions'),
-              regex: [
-                /@becomes\/cms-backend\/src/g,
-                /@bcms/g,
-                /@becomes\/cms-backend/g,
-              ],
-              endsWith: ['.js', '.ts'],
-            });
-          }
-        },
-      },
-      {
-        title: 'Copy local plugins',
-        async task() {
-          const bcmsConfig = await fs.readString('bcms.config.js');
-          const pluginString = StringUtility.textBetween(
-            bcmsConfig,
-            'plugins: [',
-            ']',
-          );
-          const plugins = pluginString
-            .split(',')
-            .filter((e) => e)
-            .map((e) => {
-              const raw = e
-                .replace(/'/g, '')
-                .replace(/"/g, '')
-                .replace(/ /g, '')
-                .replace(/\n/g, '');
-              return {
-                formatted: raw.replace(/@/g, '').replace(/\//g, '-'),
-                raw,
-              };
-            });
-          if (plugins.length > 0) {
-            const pluginList: string[] = [];
-            for (let i = 0; i < plugins.length; i++) {
-              const pluginName = plugins[i].formatted + '.tgz';
-              if (await fs.exist(['plugins', pluginName], true)) {
-                pluginList.push(plugins[i].raw);
-                await fs.copy(
-                  ['plugins', pluginName],
-                  ['dist', 'plugins', pluginName],
-                );
-              }
-            }
-            if (pluginList.length > 0) {
-              await fs.save(
-                ['dist', 'plugin-list.json'],
-                JSON.stringify(pluginList),
-              );
+          const dirs = ['functions', 'events', 'jobs', 'additional'];
+          for (let i = 0; i < dirs.length; i++) {
+            const dir = dirs[i];
+            if (await fs.exist(path.join(process.cwd(), 'dist', dir))) {
+              await fileReplacer({
+                basePath: '../src',
+                dirPath: path.join(process.cwd(), 'dist', dir),
+                regex: [
+                  /@becomes\/cms-backend\/src/g,
+                  /@bcms/g,
+                  /@becomes\/cms-backend/g,
+                ],
+                endsWith: ['.js', '.ts'],
+              });
             }
           }
         },
       },
+      // {
+      //   title: 'Copy local plugins',
+      //   async task() {
+      //     const bcmsConfig = await fs.readString('bcms.config.js');
+      //     const pluginString = StringUtility.textBetween(
+      //       bcmsConfig,
+      //       'plugins: [',
+      //       ']',
+      //     );
+      //     const plugins = pluginString
+      //       .split(',')
+      //       .filter((e) => e)
+      //       .map((e) => {
+      //         const raw = e
+      //           .replace(/'/g, '')
+      //           .replace(/"/g, '')
+      //           .replace(/ /g, '')
+      //           .replace(/\n/g, '');
+      //         return {
+      //           formatted: raw.replace(/@/g, '').replace(/\//g, '-'),
+      //           raw,
+      //         };
+      //       });
+      //     if (plugins.length > 0) {
+      //       const pluginList: string[] = [];
+      //       for (let i = 0; i < plugins.length; i++) {
+      //         const pluginName = plugins[i].formatted + '.tgz';
+      //         if (await fs.exist(['plugins', pluginName], true)) {
+      //           pluginList.push(plugins[i].raw);
+      //           await fs.copy(
+      //             ['plugins', pluginName],
+      //             ['dist', 'plugins', pluginName],
+      //           );
+      //         }
+      //       }
+      //       if (pluginList.length > 0) {
+      //         await fs.save(
+      //           ['dist', 'plugin-list.json'],
+      //           JSON.stringify(pluginList),
+      //         );
+      //       }
+      //     }
+      //   },
+      // },
       {
-        title: 'Copy package.json',
+        title: 'Find dependencies',
         async task() {
           const packageJson = JSON.parse(await fs.readString('package.json'));
-          delete packageJson.scripts;
-          delete packageJson.devDependencies;
+          const deps: InstanceDep[] = [];
+          if (packageJson.dependencies) {
+            for (const depName in packageJson.dependencies) {
+              deps.push({
+                name: depName,
+                version: packageJson.dependencies[depName],
+              });
+            }
+          }
           await fs.save(
-            ['dist', 'custom-package.json'],
-            JSON.stringify(packageJson, null, '  '),
+            ['dist', 'deps.json'],
+            JSON.stringify(deps, null, '  '),
           );
+          // delete packageJson.scripts;
+          // delete packageJson.devDependencies;
+          // await fs.save(
+          //   ['dist', 'custom-package.json'],
+          //   JSON.stringify(packageJson, null, '  '),
+          // );
         },
       },
-      {
-        title: 'Copy src data',
-        async task() {
-          await fs.copy('src', ['dist', '_src']);
-        },
-      },
-      {
-        title: 'Zip output',
-        async task() {
-          await fs.save(
-            ['dist', 'bcms.zip'],
-            await Zip.create({ location: path.join(process.cwd(), 'dist') }),
-          );
-        },
-      },
+      // {
+      //   title: 'Copy src data',
+      //   async task() {
+      //     await fs.copy('src', ['dist', '_src']);
+      //   },
+      // },
+      // {
+      //   title: 'Zip output',
+      //   async task() {
+      //     await fs.save(
+      //       ['dist', 'bcms.zip'],
+      //       await Zip.create({ location: path.join(process.cwd(), 'dist') }),
+      //     );
+      //   },
+      // },
     ]);
     await tasks.run();
   }
@@ -739,23 +759,33 @@ export class CMS {
     if (!(await client.isLoggedIn())) {
       await login({ args, client });
     }
-    if (!(await fs.exist(['dist', 'bcms.zip'], true))) {
-      await this.bundle();
-    }
-    const instanceId = await getInstanceId();
-    const zip = await fs.read(['dist', 'bcms.zip']);
-    const formData = new FormData();
-    formData.append('media', zip, 'bcms.zip');
-    const instances = await client.instance.getAll();
-    const instance = instances.find((e) => e._id === instanceId);
-    if (!instance) {
-      throw Error(
-        `Instance with ID "${instanceId}" cannot be found on your account.`,
-      );
-    }
-    const org = await client.org.get({ id: instance.org.id });
-    if (!org) {
-      throw Error(`Failed to find Organization with ID "${instance.org.id}"`);
+    // if (!(await fs.exist(['dist', 'bcms.zip'], true))) {
+    //   await this.bundle();
+    // }
+    let instance: InstanceProtected;
+    let org: Org;
+    const instanceId: string = await getInstanceId();
+    if (instanceId) {
+      const instances = await client.instance.getAll();
+      instance = instances.find(
+        (e) => e._id === instanceId,
+      ) as InstanceProtected;
+      if (!instance) {
+        throw Error(
+          `Instance with ID "${instanceId}" cannot be found on your account.`,
+        );
+      }
+      org = await client.org.get({ id: instance.org.id });
+      if (!org) {
+        throw Error(`Failed to find Organization with ID "${instance.org.id}"`);
+      }
+    } else {
+      const answers = await Select.orgAndInstance({ client });
+      instance = answers.instance;
+      org = answers.org;
+      const shimJson = JSON.parse(await fs.readString('shim.json'));
+      shimJson.instanceId = instance._id;
+      await fs.save('shim.json', JSON.stringify(shimJson));
     }
     const confirm = await prompt<{ yes: boolean }>([
       {
@@ -768,14 +798,174 @@ export class CMS {
       },
     ]);
     if (confirm.yes) {
-      await client.media.set.instanceZip({
+      const updateData: InstanceUpdateData = {
+        id: instance._id,
         orgId: instance.org.id,
-        instanceId,
-        formData: formData as never,
-        onProgress(progress) {
-          console.log(`Uploaded ${progress}%`);
+      };
+      await createTasks([
+        {
+          title: 'Initialize functions',
+          task: async () => {
+            const namespace = 'functions';
+            if (await fs.exist(['dist', namespace])) {
+              const files = (await fs.readdir(['dist', namespace])).filter(
+                (e) => e.endsWith('.js'),
+              );
+              updateData[namespace] = [];
+              for (let i = 0; i < files.length; i++) {
+                const fileName = files[i];
+                const file = await fs.readString(['dist', namespace, fileName]);
+                const itemName = StringUtility.textBetween(
+                  file,
+                  "name: '",
+                  "'",
+                );
+                const itemExists = instance[namespace].find(
+                  (e) => e.name === itemName,
+                );
+                if (itemExists) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (updateData[namespace] as any[]).push({
+                    update: {
+                      type: InstanceFJEType.EVENT,
+                      name: itemName,
+                      hash: itemExists.hash,
+                      external: true,
+                      code: Buffer.from(file).toString('base64'),
+                    },
+                  });
+                } else {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (updateData[namespace] as any).push({
+                    add: {
+                      type: InstanceFJEType.FUNCTION,
+                      name: itemName,
+                      hash: '',
+                      external: true,
+                      code: Buffer.from(file).toString('base64'),
+                    },
+                  });
+                }
+              }
+            }
+          },
         },
-      });
+        {
+          title: 'Initialize events',
+          task: async () => {
+            const namespace = 'events';
+            if (await fs.exist(['dist', namespace])) {
+              const files = (await fs.readdir(['dist', namespace])).filter(
+                (e) => e.endsWith('.js'),
+              );
+              updateData[namespace] = [];
+              for (let i = 0; i < files.length; i++) {
+                const fileName = files[i];
+                const file = await fs.readString(['dist', namespace, fileName]);
+                const itemName = fileName;
+                const itemExists = instance[namespace].find(
+                  (e) => e.name === itemName,
+                );
+                if (itemExists) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (updateData[namespace] as any[]).push({
+                    update: {
+                      type: InstanceFJEType.EVENT,
+                      name: itemName,
+                      hash: itemExists.hash,
+                      external: true,
+                      code: Buffer.from(file).toString('base64'),
+                    },
+                  });
+                } else {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (updateData[namespace] as any).push({
+                    add: {
+                      type: InstanceFJEType.FUNCTION,
+                      name: itemName,
+                      hash: '',
+                      external: true,
+                      code: Buffer.from(file).toString('base64'),
+                    },
+                  });
+                }
+              }
+            }
+          },
+        },
+        {
+          title: 'Initialize jobs',
+          task: async () => {
+            const namespace = 'jobs';
+            if (await fs.exist(['dist', namespace])) {
+              const files = (await fs.readdir(['dist', namespace])).filter(
+                (e) => e.endsWith('.js'),
+              );
+              updateData[namespace] = [];
+              for (let i = 0; i < files.length; i++) {
+                const fileName = files[i];
+                const file = await fs.readString(['dist', namespace, fileName]);
+                const itemName = fileName;
+                const itemExists = instance[namespace].find(
+                  (e) => e.name === itemName,
+                );
+                if (itemExists) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (updateData[namespace] as any[]).push({
+                    update: {
+                      type: InstanceFJEType.EVENT,
+                      name: itemName,
+                      hash: itemExists.hash,
+                      external: true,
+                      code: Buffer.from(file).toString('base64'),
+                    },
+                  });
+                } else {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (updateData[namespace] as any).push({
+                    add: {
+                      type: InstanceFJEType.FUNCTION,
+                      name: itemName,
+                      hash: '',
+                      external: true,
+                      code: Buffer.from(file).toString('base64'),
+                    },
+                  });
+                }
+              }
+            }
+          },
+        },
+        {
+          title: 'Initialize dependencies',
+          task: async () => {
+            if (await fs.exist(['dist', 'deps.json'])) {
+              const deps: InstanceDep[] = JSON.parse(
+                await fs.readString(['dist', 'deps.json']),
+              );
+              updateData.deps = deps.map((dep) => {
+                return {
+                  add: dep,
+                };
+              });
+            }
+          },
+        },
+        {
+          title: 'Deploy changes',
+          task: async () => {
+            await client.instance.update(updateData);
+          },
+        },
+      ]).run();
+      // await client.media.set.instanceZip({
+      //   orgId: instance.org.id,
+      //   instanceId,
+      //   formData: formData as never,
+      //   onProgress(progress) {
+      //     console.log(`Uploaded ${progress}%`);
+      //   },
+      // });
     }
   }
 
