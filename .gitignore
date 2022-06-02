@@ -1,15 +1,29 @@
 # compiled output
 /dist
-/lib
 /node_modules
+/doc
+/db
+/uploads
+/functions
+/events
+/jobs
+/ts-plugins
+/plugins
+/dockerfile-local/dist
+/local-dev-dist
 /public
-/dist
-
-# Environment
-.env
+/src/util/_bcms_security.json
+/migration
+/bcms.migration.json
+/bcms.config.js
+/bcms
+/static
+/__bcms_tmp
+/bcms_backup_*
 
 # Logs
-logs
+/log
+/logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -24,9 +38,10 @@ lerna-debug.log*
 /.nyc_output
 
 # IDEs and editors
-bundle.sh
-publish.sh
+.env
+bcms.db.json
 /.idea
+.idea
 .project
 .classpath
 .c9/
@@ -40,3 +55,4 @@ publish.sh
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+yarn.lock
