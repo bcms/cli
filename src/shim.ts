@@ -223,7 +223,7 @@ export class Shim {
               '# ---- SHIM START ----',
               '@reboot docker start bcms-shim',
               '* * * * * docker start bcms-shim',
-              '* * * * * bcms --shim-update',
+              '* * * * * bcms --shim update',
               '# ---- SHIM END ----\n',
             ].join('\n');
           }
