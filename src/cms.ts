@@ -233,6 +233,8 @@ export class CMS {
       await this.backup({ client, args });
     } else if (args.cms === 'restore') {
       await this.restore({ client, args });
+    } else if (args.cms === 'create') {
+      await this.create();
     }
   }
 
@@ -1093,5 +1095,59 @@ export class CMS {
     if (instance) {
       await createTasks(CMS.pullTasks(instance, repoFS, client)).run();
     }
+  }
+
+  static async create(): Promise<void> {
+    const answers = await prompt<{ projectName: string }>([
+      {
+        name: 'projectName',
+        message: 'Enter a project name',
+        type: 'input',
+        default: 'my-bcms',
+      },
+    ]);
+    await createTasks([
+      {
+        title: 'Clone GitHub repository',
+        task: async () => {
+          await ChildProcess.spawn('git', [
+            'clone',
+            'https://github.com/becomesco/cms',
+            answers.projectName,
+          ]);
+        },
+      },
+      {
+        title: 'Install dependencies',
+        task: async () => {
+          await ChildProcess.spawn('npm', ['i'], {
+            stdio: 'inherit',
+            cwd: path.join(process.cwd(), answers.projectName),
+          });
+        },
+      },
+      {
+        title: 'Setup project',
+        task: async () => {
+          await ChildProcess.spawn('npm', ['run', 'setup'], {
+            stdio: 'inherit',
+            cwd: path.join(process.cwd(), answers.projectName),
+          });
+        },
+      },
+    ]).run();
+
+    console.log(
+      [
+        '',
+        'Done :)',
+        '',
+        '',
+        `$ cd ${answers.projectName}`,
+        '$ docker-compose up',
+        '',
+        '',
+      ].join('\n'),
+    );
   }
 }

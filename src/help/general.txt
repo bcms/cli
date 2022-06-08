@@ -22,6 +22,7 @@
 
 --cms <command>
   commands:
+    create  - create a new BCMS project
     bundle  - prepare the project for deployment
     deploy  - deploy the project to BCMS Cloud
     clone   - create starter project and get instance data if available
