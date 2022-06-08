@@ -1,6 +1,6 @@
 {
   "name": "@becomes/cms-cli",
-  "version": "2.2.7",
+  "version": "2.2.8",
   "description": "CLI to help you with BCMS development.",
   "author": "becomes.co",
   "license": "MIT",
