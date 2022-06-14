@@ -55,3 +55,7 @@
     update   - update BCMS SHIM
 
 --cloudOrigin <url> - set an origin of the BCMS Cloud for running command
+
+--website <command>
+  commands:
+    create - Create a website using a framework with the BCMS integration

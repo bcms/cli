@@ -1,9 +1,9 @@
 import { createBcmsSdk } from '@becomes/cms-sdk';
-import type { BCMSEntity, BCMSSdk } from '@becomes/cms-sdk/types';
+import type { BCMSSdk, BCMSSdkCacheItem } from '@becomes/cms-sdk/types';
 
 export function createSdk3(config: { origin: string }): BCMSSdk {
   const cache: {
-    [name: string]: BCMSEntity[];
+    [name: string]: BCMSSdkCacheItem[];
   } = {};
   return createBcmsSdk({
     origin: config.origin,
@@ -14,7 +14,7 @@ export function createSdk3(config: { origin: string }): BCMSSdk {
             if (!cache[data.name]) {
               return [];
             }
-            const output: BCMSEntity[] = [];
+            const output: BCMSSdkCacheItem[] = [];
             for (let i = 0; i < cache[data.name].length; i++) {
               const item = cache[data.name][i];
               if (data.query(item as never)) {
@@ -45,9 +45,7 @@ export function createSdk3(config: { origin: string }): BCMSSdk {
           set(data) {
             if (!cache[data.name]) {
               cache[data.name] =
-                data.payload instanceof Array
-                  ? (data.payload as BCMSEntity[])
-                  : [data.payload];
+                data.payload instanceof Array ? data.payload : [data.payload];
             } else {
               const input =
                 data.payload instanceof Array ? data.payload : [data.payload];

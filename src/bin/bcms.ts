@@ -30,6 +30,7 @@ import { Migration } from '../migration';
 import { Most } from '../most';
 import { Shim } from '../shim';
 import { help } from '../help';
+import { Website } from '../website';
 
 async function main() {
   const fs = createFS({
@@ -167,6 +168,8 @@ async function main() {
     await Most.resolve({ args });
   } else if (typeof args.shim === 'string') {
     await Shim.resolve({ args, client });
+  } else if (args.website) {
+    await Website.resolve({ args, client });
   } else if (args.help) {
     await help();
   }

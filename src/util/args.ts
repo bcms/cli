@@ -133,6 +133,9 @@ export function parseArgs(rawArgs: string[]): Args {
     help: {
       type: 'boolean',
     },
+    website: {
+      type: 'string',
+    },
   };
   const groups: {
     [name: string]: {
@@ -226,6 +229,8 @@ export function parseArgs(rawArgs: string[]): Args {
 
     '--help': groups.help.name,
     '--h': groups.help.name,
+
+    '--website': groups.website.name,
   };
   const output: {
     [name: string]: string | boolean | undefined;
