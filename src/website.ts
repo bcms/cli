@@ -142,7 +142,7 @@ export class Website {
             } else if (answers.projectType === 'Nuxt') {
               additionalEnvVars = [
                 `NUXT_ENV_BCMS_API_ORIGIN=${apiOrigin}`,
-                `NUXT_ENV_BCMS_API_PUBLIC_KEY_ID=${apiKey._id}`,
+                `NUXT_ENV_BCMS_API_PUBLIC_KEY=${apiKey._id}`,
               ];
             } else if (answers.projectType === 'Gatsby') {
               additionalEnvVars = [
@@ -151,7 +151,7 @@ export class Website {
               ];
             }
             await repoFs.save(
-              '.env',
+              answers.projectType === 'Gatsby' ? '.env.development' : '.env',
               [
                 `BCMS_API_ORIGIN=${apiOrigin}`,
                 `BCMS_API_KEY=${apiKey._id}`,
