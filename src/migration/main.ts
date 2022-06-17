@@ -1609,11 +1609,11 @@ export class Migration {
         const inputFs = createFS({
           base: path.join(Migration.basePath, 'v3_data'),
         });
-        const fsdbOutput: {
-          [name: string]: {
-            [id: string]: any;
-          };
-        } = {};
+        // const fsdbOutput: {
+        //   [name: string]: {
+        //     [id: string]: any;
+        //   };
+        // } = {};
         for (let i = 0; i < Migration.collectionNames.v3.length; i++) {
           const cName = Migration.collectionNames.v3[i];
           let dbData = [];
@@ -1626,16 +1626,24 @@ export class Migration {
               dbData = [];
             }
           }
-          fsdbOutput[`${prfx}${cName}`] = {};
+          // fsdbOutput[`${prfx}${cName}`] = {};
+          const output: {
+            [id: string]: any[];
+          } = {};
           for (let j = 0; j < dbData.length; j++) {
             const entity = dbData[j];
-            fsdbOutput[`${prfx}${cName}`][entity._id] = entity;
+            output[entity._id] = entity;
+            // fsdbOutput[`${prfx}${cName}`][entity._id] = entity;
           }
+          inputFs.save(
+            ['db', `${prfx}${cName}.json`],
+            JSON.stringify(output, null, '  '),
+          );
 
           terminalListItems[cName].maker = '✓';
           updateTerminalList();
         }
-        await inputFs.save(`${prfx}.fsdb.json`, JSON.stringify(fsdbOutput));
+        // await inputFs.save(`${prfx}.fsdb.json`, JSON.stringify(fsdbOutput));
       },
       async v3Push({ args, client }) {
         console.log('\n\nCreating archive. Please wait ...');
