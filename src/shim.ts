@@ -239,6 +239,7 @@ export class Shim {
     args: Args;
     client: ApiClient;
   }): Promise<void> {
+    console.log('Check shim updates ...');
     const containersInfo = await Docker.container.list();
     const container = containersInfo.find((e) =>
       e.names.startsWith('bcms-instance-'),
@@ -252,7 +253,14 @@ export class Shim {
     if (!shimContainer) {
       return;
     }
+    console.log(
+      'Curr:',
+      shimContainer.image,
+      'New:',
+      `becomes/cms-shim:${newShimVersion}`,
+    );
     if (shimContainer.image !== `becomes/cms-shim:${newShimVersion}`) {
+      console.log('Updating Shim');
       await Docker.image.pull(`becomes/cms-shim:${newShimVersion}`);
       await Docker.container.stop('bcms-shim');
       await Docker.container.remove('bcms-shim');
