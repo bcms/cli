@@ -24,6 +24,12 @@ module.exports = createConfig({
           await fs.copy(['src', 'bcms-client-v2'], ['dist', 'bcms-client-v2']);
         },
       },
+      {
+        title: 'Copy init data',
+        async task() {
+          await fs.copy(['src', 'init'], ['dist', 'init']);
+        },
+      },
     ],
   },
 });
