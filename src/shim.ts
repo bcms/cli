@@ -213,17 +213,17 @@ export class Shim {
             fileContent = fileContent.replace(
               shimPart,
               [
-                '@reboot docker start bcms-shim',
-                '* * * * * docker start bcms-shim',
-                '* * * * * bcms --shim update',
+                '@reboot sudo docker start bcms-shim',
+                '* * * * * sudo docker start bcms-shim',
+                '* * * * * sudo bcms --shim update',
               ].join('\n'),
             );
           } else {
             fileContent += [
               '# ---- SHIM START ----',
-              '@reboot docker start bcms-shim',
-              '* * * * * docker start bcms-shim',
-              '* * * * * bcms --shim update',
+              '@reboot sudo docker start bcms-shim',
+              '* * * * * sudo docker start bcms-shim',
+              '* * * * * sudo bcms --shim update',
               '# ---- SHIM END ----\n',
             ].join('\n');
           }

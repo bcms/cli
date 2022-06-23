@@ -445,15 +445,15 @@ export class Instance {
                 fileContent = fileContent.replace(
                   dbPart,
                   [
-                    `@reboot docker start ${dbContainerName}`,
-                    `* * * * * docker start ${dbContainerName}`,
+                    `@reboot sudo docker start ${dbContainerName}`,
+                    `* * * * * sudo docker start ${dbContainerName}`,
                   ].join('\n'),
                 );
               } else {
                 fileContent += [
                   `# ---- DB ${dbContainerName} ----`,
-                  `@reboot docker start ${dbContainerName}`,
-                  `* * * * * docker start ${dbContainerName}`,
+                  `@reboot sudo docker start ${dbContainerName}`,
+                  `* * * * * sudo docker start ${dbContainerName}`,
                   `# ---- DB END ${dbContainerName}\n`,
                 ].join('\n');
               }
