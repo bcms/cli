@@ -1,0 +1,34 @@
+{
+  "62b31eb703a35aa391964423": {
+    "_id": "62b31eb703a35aa391964423",
+    "createdAt": 1655905975211,
+    "updatedAt": 1655906004023,
+    "count": 5,
+    "name": "Templates",
+    "forId": "templates"
+  },
+  "62b31f1b03a35aa391964428": {
+    "_id": "62b31f1b03a35aa391964428",
+    "createdAt": 1655906075104,
+    "updatedAt": 1655906075104,
+    "count": 2,
+    "name": "Groups",
+    "forId": "groups"
+  },
+  "62b31f8703a35aa39196442a": {
+    "_id": "62b31f8703a35aa39196442a",
+    "createdAt": 1655906183983,
+    "updatedAt": 1655991075705,
+    "count": 3,
+    "name": "Widgets",
+    "forId": "widgets"
+  },
+  "62b323ef03a35aa391964433": {
+    "_id": "62b323ef03a35aa391964433",
+    "createdAt": 1655907311230,
+    "updatedAt": 1655908211164,
+    "count": 12,
+    "name": "Entries",
+    "forId": "entries"
+  }
+}

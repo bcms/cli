@@ -1098,14 +1098,21 @@ export class CMS {
   }
 
   static async create(): Promise<void> {
-    const answers = await prompt<{ projectName: string }>([
+    const answers = await prompt<{ projectName: string; init: boolean }>([
       {
         name: 'projectName',
         message: 'Enter a project name',
         type: 'input',
         default: 'my-bcms',
       },
+      {
+        name: 'init',
+        message: 'Would you like to initialize the BCMS with data?',
+        type: 'confirm',
+        default: false,
+      },
     ]);
+
     await createTasks([
       {
         title: 'Clone GitHub repository',
@@ -1133,6 +1140,21 @@ export class CMS {
             stdio: 'inherit',
             cwd: path.join(process.cwd(), answers.projectName),
           });
+        },
+      },
+      {
+        title: 'Initialize data',
+        task: async () => {
+          if (answers.init) {
+            await fs.copy(path.join(__dirname, 'init', 'v3', 'db'), [
+              answers.projectName,
+              'db',
+            ]);
+            await fs.copy(path.join(__dirname, 'init', 'v3', 'uploads'), [
+              answers.projectName,
+              'uploads',
+            ]);
+          }
         },
       },
     ]).run();
