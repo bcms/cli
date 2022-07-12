@@ -1,3 +1,5 @@
+export * from './html-to-prosemirror';
+
 export * from './args';
 export * from './create-sdk';
 export * from './docker';

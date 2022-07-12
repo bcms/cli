@@ -3,11 +3,10 @@ import { BCMSClient as BCMSClientV2 } from '../bcms-client-v2';
 import { v4 as uuidv4 } from 'uuid';
 import { createFS } from '@banez/fs';
 import { ChildProcess } from '@banez/child_process';
-import { getCmsInfo, MediaUtil, Zip } from '../util';
+import { getCmsInfo, MediaUtil, ProseMirrorRenderer, Zip } from '../util';
 import type { ChildProcessOnChunkHelperOutput } from '@banez/child_process/types';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const htop = require('html-to-prosemirror');
-const htopRenderer = new htop.Renderer();
+const htopRenderer = new ProseMirrorRenderer();
 import { prompt } from 'inquirer';
 import {
   ApiKeyV2,
