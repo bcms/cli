@@ -995,10 +995,11 @@ export class CMS {
         {
           title: 'Initialize dependencies',
           task: async () => {
-            if (await fs.exist(['dist', 'deps.json'])) {
+            if (await fs.exist(['dist', 'deps.json'], true)) {
               const deps: InstanceDep[] = JSON.parse(
                 await fs.readString(['dist', 'deps.json']),
               );
+              console.log(deps)
               updateData.deps = deps.map((dep) => {
                 return {
                   add: dep,
