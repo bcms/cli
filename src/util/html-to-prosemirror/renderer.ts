@@ -13,6 +13,7 @@ import {
   ListItem,
   OrderedList,
   Paragraph,
+  Text,
 } from './Nodes';
 
 export class ProseMirrorRenderer {
