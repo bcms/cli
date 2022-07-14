@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as crypto from 'crypto';
 import {
   createSdk3,
   createTasks,
@@ -640,6 +641,9 @@ export class CMS {
         title: 'Build typescript',
         async task() {
           await ChildProcess.spawn('npm', ['run', 'build']);
+          await fs.copy('dist', 'raw');
+          await fs.copy('raw', ['dist', 'raw']);
+          await fs.deleteDir('raw');
         },
       },
       {
@@ -814,17 +818,20 @@ export class CMS {
                 (e) => e.endsWith('.js'),
               );
               updateData[namespace] = [];
+              const fnNames: string[] = [];
               for (let i = 0; i < files.length; i++) {
                 const fileName = files[i];
                 const file = await fs.readString(['dist', namespace, fileName]);
-                const itemName = StringUtility.textBetween(
-                  file,
-                  "name: '",
-                  "'",
-                );
+                const data = await (
+                  await import(
+                    path.join(process.cwd(), 'dist', 'raw', namespace, fileName)
+                  )
+                ).default();
+                const itemName = data.config.name;
                 const itemExists = instance[namespace].find(
                   (e) => e.name === itemName,
                 );
+                fnNames.push(itemName);
                 if (itemExists) {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   (updateData[namespace] as any[]).push({
@@ -842,11 +849,21 @@ export class CMS {
                     add: {
                       type: InstanceFJEType.FUNCTION,
                       name: itemName,
-                      hash: '',
+                      hash: crypto.randomBytes(16).toString('hex'),
                       external: true,
                       code: Buffer.from(file).toString('base64'),
                     },
                   });
+                }
+              }
+              for (let i = 0; i < instance.functions.length; i++) {
+                const fn = instance.functions[i];
+                if (fn.external) {
+                  if (!fnNames.includes(fn.name)) {
+                    updateData[namespace].push({
+                      remove: fn.hash,
+                    });
+                  }
                 }
               }
             }
@@ -885,11 +902,48 @@ export class CMS {
                     add: {
                       type: InstanceFJEType.FUNCTION,
                       name: itemName,
-                      hash: '',
+                      hash: crypto.randomBytes(16).toString('hex'),
                       external: true,
                       code: Buffer.from(file).toString('base64'),
                     },
                   });
+                }
+              }
+            }
+          },
+        },
+        {
+          title: 'Initialize additional assets',
+          task: async () => {
+            const namespace = 'additional';
+            if (await fs.exist(['dist', namespace])) {
+              const files = (await fs.fileTree(['dist', namespace], '')).filter(
+                (e) => e.path.rel.endsWith('.js'),
+              );
+              updateData.additionalFiles = [];
+              for (let i = 0; i < files.length; i++) {
+                const fileInfo = files[i];
+                const filePathParts = fileInfo.path.rel.split('/');
+                const fileName = filePathParts[filePathParts.length - 1];
+                updateData.additionalFiles.push({
+                  set: {
+                    name: fileName,
+                    path: fileInfo.path.rel,
+                    data: Buffer.from(
+                      await fs.readString(fileInfo.path.abs),
+                    ).toString('base64'),
+                  },
+                });
+              }
+              if (instance.additionalFiles) {
+                for (let i = 0; i < instance.additionalFiles.length; i++) {
+                  const af = instance.additionalFiles[i];
+                  const fileInfo = files.find((e) => e.path.rel === af.path);
+                  if (!fileInfo) {
+                    updateData.additionalFiles.push({
+                      remove: af.path,
+                    });
+                  }
                 }
               }
             }
@@ -928,7 +982,7 @@ export class CMS {
                     add: {
                       type: InstanceFJEType.FUNCTION,
                       name: itemName,
-                      hash: '',
+                      hash: crypto.randomBytes(16).toString('hex'),
                       external: true,
                       code: Buffer.from(file).toString('base64'),
                     },
@@ -960,14 +1014,6 @@ export class CMS {
           },
         },
       ]).run();
-      // await client.media.set.instanceZip({
-      //   orgId: instance.org.id,
-      //   instanceId,
-      //   formData: formData as never,
-      //   onProgress(progress) {
-      //     console.log(`Uploaded ${progress}%`);
-      //   },
-      // });
     }
   }
 
