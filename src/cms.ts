@@ -278,6 +278,9 @@ export class CMS {
     });
     // Unzipping
     {
+      if (await tmpFs.exist('')) {
+        await tmpFs.deleteDir('');
+      }
       Zip.unzip({
         location: path.join(process.cwd(), '__bcms_tmp'),
         buffer: await fs.read(backupSelect.file),
@@ -999,7 +1002,7 @@ export class CMS {
               const deps: InstanceDep[] = JSON.parse(
                 await fs.readString(['dist', 'deps.json']),
               );
-              console.log(deps)
+              console.log(deps);
               updateData.deps = deps.map((dep) => {
                 return {
                   add: dep,
