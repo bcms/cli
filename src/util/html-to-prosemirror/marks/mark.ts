@@ -2,9 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export class Mark {
   type: string;
-  DOMNode: any;
 
-  constructor(public DomNode: any) {
+  constructor(public DOMNode: any) {
     this.type = 'mark';
   }
 
