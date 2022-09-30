@@ -6,6 +6,40 @@ import type {
 import { prompt } from 'inquirer';
 
 export class Select {
+  static async cloudOrLocal({ client }: { client: ApiClient }): Promise<{
+    local?: boolean;
+    cloud?: {
+      org: Org;
+      instance: InstanceProtected;
+    };
+  }> {
+    const result = await prompt<{ type: 'cloud' | 'local' }>([
+      {
+        message: 'Which type of BCMS you want to connect to?',
+        name: 'type',
+        type: 'list',
+        choices: [
+          {
+            name: 'Live',
+            value: 'cloud',
+          },
+          {
+            name: 'Local',
+            value: 'local',
+          },
+        ],
+      },
+    ]);
+    if (result.type === 'local') {
+      return {
+        local: true,
+      };
+    }
+    return {
+      cloud: await Select.orgAndInstance({ client }),
+    };
+  }
+
   static async orgAndInstance({ client }: { client: ApiClient }): Promise<{
     org: Org;
     instance: InstanceProtected;

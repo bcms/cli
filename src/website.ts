@@ -71,14 +71,16 @@ export class Website {
         task: async () => {
           const connect = await prompt<{ yes: boolean }>([
             {
-              message: 'Would you like to connect with you BCMS?',
+              message: 'Would you like to connect with your BCMS?',
               type: 'confirm',
               name: 'yes',
             },
           ]);
           if (connect.yes) {
-            const { instance } = await Select.orgAndInstance({ client });
-            const apiOrigin = `https://${instance.domains[0]}`;
+            const result = await Select.cloudOrLocal({ client });
+            const apiOrigin = result.cloud
+              ? `https://${result.cloud.instance.domains[0]}`
+              : 'http://localhost:8080';
             const sdk = createSdk3({
               origin: apiOrigin,
             });
