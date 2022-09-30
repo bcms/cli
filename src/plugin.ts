@@ -176,7 +176,7 @@ export class Plugin {
         title: 'Copy package.json',
         async task() {
           packageJson = JSON.parse(await fs.readString('package.json'));
-          packageJson.name = `@becomes/cms-plugin-${pluginName}`;
+          packageJson.name = `bcms-plugin-${pluginName}`;
           packageJson.devDependencies = undefined;
           packageJson.nodemonConfig = undefined;
           packageJson.scripts = undefined;
@@ -200,12 +200,12 @@ export class Plugin {
                   process.cwd(),
                   'dist',
                   pluginName,
-                  `becomes-cms-plugin-${pluginName}-${packageJson.version}.tgz`,
+                  `bcms-plugin-${pluginName}-${packageJson.version}.tgz`,
                 ),
                 path.join(
                   process.cwd(),
                   'dist',
-                  `becomes-cms-plugin-${pluginName}-${packageJson.version}.tgz`,
+                  `bcms-plugin-${pluginName}-${packageJson.version}.tgz`,
                 ),
               );
               await fse.remove(
@@ -213,7 +213,7 @@ export class Plugin {
                   process.cwd(),
                   'dist',
                   pluginName,
-                  `becomes-cms-plugin-${pluginName}-${packageJson.version}.tgz`,
+                  `bcms-plugin-${pluginName}-${packageJson.version}.tgz`,
                 ),
               );
               resolve();
