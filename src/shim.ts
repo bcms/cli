@@ -27,6 +27,7 @@ export class Shim {
   }
   static async install({
     args,
+    client,
   }: {
     args: Args;
     client: ApiClient;
@@ -113,9 +114,21 @@ export class Shim {
       {
         title: 'Pull Docker BCMS Shim image',
         async task() {
+          const containersInfo = await Docker.container.list();
+          const container = containersInfo.find((e) =>
+            e.names.startsWith('bcms-instance-'),
+          );
+          if (!container) {
+            return;
+          }
+          const randomInstanceId = container.names.replace(
+            'bcms-instance-',
+            '',
+          );
+          const newestShimVersion = await client.shim.version(randomInstanceId);
           await ChildProcess.spawn('docker', [
             'pull',
-            `becomes/cms-shim:${args.version}`,
+            `becomes/cms-shim:${args.version || newestShimVersion}`,
           ]);
         },
       },
