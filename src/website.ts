@@ -79,7 +79,7 @@ export class Website {
           if (connect.yes) {
             const result = await Select.cloudOrLocal({ client });
             const apiOrigin = result.cloud
-              ? `https://${result.cloud.instance.domains[0]}`
+              ? `https://${result.cloud.instance.domains[0].name}`
               : 'http://localhost:8080';
             const sdk = createSdk3({
               origin: apiOrigin,
