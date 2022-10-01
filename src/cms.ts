@@ -281,6 +281,7 @@ export class CMS {
       if (await tmpFs.exist('')) {
         await tmpFs.deleteDir('');
       }
+      console.log('Unpacking archive ...')
       Zip.unzip({
         location: path.join(process.cwd(), '__bcms_tmp'),
         buffer: await fs.read(backupSelect.file),
@@ -302,7 +303,11 @@ export class CMS {
       },
     });
     Terminal.render();
-    const origin = 'https://' + instance.domains[0];
+    const origin =
+      'https://' +
+      (instance.domains[1]
+        ? instance.domains[1].name
+        : instance.domains[0].name);
     // const origin = 'http://localhost:8080';
     const sdk3 = createSdk3({
       origin,

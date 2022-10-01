@@ -263,7 +263,7 @@ export class Migration {
     v2(data: { inputMedia: MediaV2; v2Media: MediaV2[] }): MediaV3;
   } {
     return {
-      v2({ inputMedia, v2Media }) {
+      v2({ inputMedia }) {
         const output: MediaV3 = {
           _id: inputMedia._id.$oid,
           createdAt: inputMedia.createdAt,
@@ -274,36 +274,36 @@ export class Migration {
           hasChildren: inputMedia.hasChildren,
           height: -1,
           width: -1,
-          isInRoot: false,
+          isInRoot: inputMedia.isInRoot,
           mimetype: inputMedia.mimetype,
           name: inputMedia.name,
-          parentId: '',
+          parentId: inputMedia.parentId,
           size: inputMedia.size,
           type: inputMedia.type as never,
           userId: inputMedia.userId,
         };
-        if (inputMedia.isInRoot) {
-          output.isInRoot = true;
-        } else {
-          const pathParts = inputMedia.path.split('/').slice(1);
-          if (pathParts.length > 0) {
-            let parentMedia: MediaV2 | undefined = undefined;
-            if (inputMedia.type === MediaV2Type.DIR) {
-              const parentName = pathParts[pathParts.length - 2];
-              parentMedia = v2Media.find((e) => e.name === parentName);
-            } else {
-              const parentName = pathParts[pathParts.length - 1];
-              parentMedia = v2Media.find((e) => e.name === parentName);
-            }
-            if (parentMedia) {
-              output.parentId = parentMedia._id.$oid;
-            } else {
-              output.isInRoot = true;
-            }
-          } else {
-            output.isInRoot = true;
-          }
-        }
+        // if (inputMedia.isInRoot) {
+        //   output.isInRoot = true;
+        // } else {
+        //   const pathParts = inputMedia.path.split('/').slice(1);
+        //   if (pathParts.length > 0) {
+        //     let parentMedia: MediaV2 | undefined = undefined;
+        //     if (inputMedia.type === MediaV2Type.DIR) {
+        //       const parentName = pathParts[pathParts.length - 2];
+        //       parentMedia = v2Media.find((e) => e.name === parentName);
+        //     } else {
+        //       const parentName = pathParts[pathParts.length - 1];
+        //       parentMedia = v2Media.find((e) => e.name === parentName);
+        //     }
+        //     if (parentMedia) {
+        //       output.parentId = parentMedia._id.$oid;
+        //     } else {
+        //       output.isInRoot = true;
+        //     }
+        //   } else {
+        //     output.isInRoot = true;
+        //   }
+        // }
         return output;
       },
     };
@@ -1208,7 +1208,7 @@ export class Migration {
                       updatedAt: item.updatedAt,
                       cid: (j + 1).toString(16),
                       templateId: item.templateId,
-                      userId: item.userId,
+                      userId: item.userId || 'none',
                       status: item.status,
                       meta: newMeta,
                       content: newContent,
@@ -1645,38 +1645,57 @@ export class Migration {
         // await inputFs.save(`${prfx}.fsdb.json`, JSON.stringify(fsdbOutput));
       },
       async v3Push({ args, client }) {
-        console.log('\n\nCreating archive. Please wait ...');
-        await Migration.fs.mkdir('tmp');
-        await Migration.fs.mkdir(['tmp', 'db']);
-        await Migration.fs.mkdir(['tmp', 'uploads']);
-        const dbFiles = (await Migration.fs.readdir('v3_data')).filter((e) =>
-          e.endsWith('.json'),
+        const rootFiles = await Migration.fs.readdir('..');
+        const backupFiles = rootFiles.filter(
+          (e) => e.startsWith('bcms_backup_') && e.endsWith('.zip'),
         );
-        for (let i = 0; i < dbFiles.length; i++) {
-          const dbFile = dbFiles[i];
-          await Migration.fs.copy(['v3_data', dbFile], ['tmp', 'db', dbFile]);
+        let createBackup = true;
+        if (backupFiles.length > 0) {
+          const answer = await prompt<{ createBackup: boolean }>([
+            {
+              message: 'Would you like create new backup file?',
+              type: 'confirm',
+              name: 'createBackup',
+            },
+          ]);
+          if (!answer.createBackup) {
+            createBackup = false;
+          }
         }
-        await Migration.fs.copy(
-          ['v3_data', 'uploads'],
-          ['tmp', 'uploads', 'uploads'],
-        );
-        await Migration.fs.save(
-          ['tmp', 'uploads.zip'],
-          await Zip.create({
-            location: path.join(process.cwd(), 'migration', 'tmp', 'uploads'),
-          }),
-        );
-        await Migration.fs.deleteDir(['tmp', 'uploads']);
-        const backupFileName = `bcms_backup_${new Date().toISOString()}.zip`;
-        await Migration.fs.save(
-          ['..', backupFileName],
-          await Zip.create({
-            location: path.join(process.cwd(), 'migration', 'tmp'),
-          }),
-        );
-        await Migration.fs.deleteDir('tmp');
+        if (createBackup) {
+          console.log('\n\nCreating archive. Please wait ...');
+          await Migration.fs.mkdir('tmp');
+          await Migration.fs.mkdir(['tmp', 'db']);
+          await Migration.fs.mkdir(['tmp', 'uploads']);
+          const dbFiles = (await Migration.fs.readdir('v3_data')).filter((e) =>
+            e.endsWith('.json'),
+          );
+          for (let i = 0; i < dbFiles.length; i++) {
+            const dbFile = dbFiles[i];
+            await Migration.fs.copy(['v3_data', dbFile], ['tmp', 'db', dbFile]);
+          }
+          await Migration.fs.copy(
+            ['v3_data', 'uploads'],
+            ['tmp', 'uploads', 'uploads'],
+          );
+          await Migration.fs.save(
+            ['tmp', 'uploads.zip'],
+            await Zip.create({
+              location: path.join(process.cwd(), 'migration', 'tmp', 'uploads'),
+            }),
+          );
+          await Migration.fs.deleteDir(['tmp', 'uploads']);
+          const backupFileName = `bcms_backup_${new Date().toISOString()}.zip`;
+          await Migration.fs.save(
+            ['..', backupFileName],
+            await Zip.create({
+              location: path.join(process.cwd(), 'migration', 'tmp'),
+            }),
+          );
+          await Migration.fs.deleteDir('tmp');
+        }
         await CMS.restore({ args, client });
-        await Migration.fs.deleteFile(['..', backupFileName]);
+        // await Migration.fs.deleteFile(['..', backupFileName]);
       },
     };
   }
