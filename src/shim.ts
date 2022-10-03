@@ -33,7 +33,12 @@ export class Shim {
     client: ApiClient;
   }): Promise<void> {
     if (!args.version) {
-      args.version = 'latest';
+      const instance = (await client.instance.getAllLite())[0];
+      if (!instance) {
+        args.version = 'latest';
+      } else {
+        args.version = await client.shim.version(instance._id);
+      }
     }
 
     if (!(await DockerUtil.setup())) {
@@ -114,21 +119,9 @@ export class Shim {
       {
         title: 'Pull Docker BCMS Shim image',
         async task() {
-          const containersInfo = await Docker.container.list();
-          const container = containersInfo.find((e) =>
-            e.names.startsWith('bcms-instance-'),
-          );
-          if (!container) {
-            return;
-          }
-          const randomInstanceId = container.names.replace(
-            'bcms-instance-',
-            '',
-          );
-          const newestShimVersion = await client.shim.version(randomInstanceId);
           await ChildProcess.spawn('docker', [
             'pull',
-            `becomes/cms-shim:${args.version || newestShimVersion}`,
+            `becomes/cms-shim:${args.version}`,
           ]);
         },
       },
@@ -253,15 +246,12 @@ export class Shim {
     client: ApiClient;
   }): Promise<void> {
     console.log('Check shim updates ...');
-    const containersInfo = await Docker.container.list();
-    const container = containersInfo.find((e) =>
-      e.names.startsWith('bcms-instance-'),
-    );
-    if (!container) {
-      return;
+    const newShimVersion = 'latest';
+    const instance = (await client.instance.getAllLite())[0];
+    if (instance) {
+      args.version = await client.shim.version(instance._id);
     }
-    const randomInstanceId = container.names.replace('bcms-instance-', '');
-    const newShimVersion = await client.shim.version(randomInstanceId);
+    const containersInfo = await Docker.container.list();
     const shimContainer = containersInfo.find((e) => e.names === 'bcms-shim');
     if (!shimContainer) {
       return;
