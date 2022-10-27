@@ -9,7 +9,6 @@ export class Select {
   static async cloudOrLocal({ client }: { client: ApiClient }): Promise<{
     local?: boolean;
     cloud?: {
-      org: Org;
       instance: InstanceProtected;
     };
   }> {
@@ -36,7 +35,7 @@ export class Select {
       };
     }
     return {
-      cloud: await Select.orgAndInstance({ client }),
+      cloud: await Select.instance({ client }),
     };
   }
 
@@ -85,5 +84,31 @@ export class Select {
       );
     }
     return { org, instance };
+  }
+
+  static async instance({ client }: { client: ApiClient }): Promise<{
+    instance: InstanceProtected;
+  }> {
+    const instances = await client.instance.getAll();
+    const instResult = await prompt<{ instanceId: string }>([
+      {
+        name: 'instanceId',
+        type: 'list',
+        choices: instances.map((inst) => {
+          return {
+            name: inst.name,
+            value: inst._id,
+          };
+        }),
+        message: 'Select an instance:',
+      },
+    ]);
+    const instance = instances.find((e) => e._id === instResult.instanceId);
+    if (!instance) {
+      throw Error(
+        `Instance with ID "${instResult.instanceId}" does not exist.`,
+      );
+    }
+    return { instance };
   }
 }
