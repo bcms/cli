@@ -7,5 +7,11 @@ export async function logout({
   args: Args;
   client: ApiClient;
 }): Promise<void> {
-  await client.auth.logout();
+  try {
+    await client.auth.logout();
+  } catch (error) {
+    console.warn(error);
+  }
+  await client.storage.remove('at');
+  await client.storage.remove('rt');
 }
