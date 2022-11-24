@@ -844,7 +844,7 @@ export class CMS {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   (updateData[namespace] as any[]).push({
                     update: {
-                      type: InstanceFJEType.EVENT,
+                      type: InstanceFJEType.FUNCTION,
                       name: itemName,
                       hash: itemExists.hash,
                       external: true,
@@ -908,7 +908,7 @@ export class CMS {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   (updateData[namespace] as any).push({
                     add: {
-                      type: InstanceFJEType.FUNCTION,
+                      type: InstanceFJEType.EVENT,
                       name: itemName,
                       hash: crypto.randomBytes(16).toString('hex'),
                       external: true,
@@ -977,7 +977,7 @@ export class CMS {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   (updateData[namespace] as any[]).push({
                     update: {
-                      type: InstanceFJEType.EVENT,
+                      type: InstanceFJEType.JOB,
                       name: itemName,
                       hash: itemExists.hash,
                       external: true,
@@ -988,7 +988,7 @@ export class CMS {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   (updateData[namespace] as any).push({
                     add: {
-                      type: InstanceFJEType.FUNCTION,
+                      type: InstanceFJEType.JOB,
                       name: itemName,
                       hash: crypto.randomBytes(16).toString('hex'),
                       external: true,
