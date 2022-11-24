@@ -281,7 +281,7 @@ export class CMS {
       if (await tmpFs.exist('')) {
         await tmpFs.deleteDir('');
       }
-      console.log('Unpacking archive ...')
+      console.log('Unpacking archive ...');
       Zip.unzip({
         location: path.join(process.cwd(), '__bcms_tmp'),
         buffer: await fs.read(backupSelect.file),
@@ -864,6 +864,7 @@ export class CMS {
                   });
                 }
               }
+              console.log(instance.functions);
               for (let i = 0; i < instance.functions.length; i++) {
                 const fn = instance.functions[i];
                 if (fn.external) {
@@ -874,6 +875,16 @@ export class CMS {
                   }
                 }
               }
+            } else {
+              updateData[namespace] = [];
+              for (let i = 0; i < instance.functions.length; i++) {
+                const item = instance.functions[i];
+                if (item.external) {
+                  updateData[namespace].push({
+                    remove: item.hash,
+                  });
+                }
+              }
             }
           },
         },
@@ -881,11 +892,11 @@ export class CMS {
           title: 'Initialize events',
           task: async () => {
             const namespace = 'events';
+            updateData[namespace] = [];
             if (await fs.exist(['dist', namespace])) {
               const files = (await fs.readdir(['dist', namespace])).filter(
                 (e) => e.endsWith('.js'),
               );
-              updateData[namespace] = [];
               for (let i = 0; i < files.length; i++) {
                 const fileName = files[i];
                 const file = await fs.readString(['dist', namespace, fileName]);
@@ -917,6 +928,15 @@ export class CMS {
                   });
                 }
               }
+            } else {
+              for (let i = 0; i < instance.events.length; i++) {
+                const item = instance.events[i];
+                if (item.external) {
+                  updateData[namespace].push({
+                    remove: item.hash,
+                  });
+                }
+              }
             }
           },
         },
@@ -924,11 +944,11 @@ export class CMS {
           title: 'Initialize additional assets',
           task: async () => {
             const namespace = 'additional';
+            updateData.additionalFiles = [];
             if (await fs.exist(['dist', namespace])) {
               const files = (await fs.fileTree(['dist', namespace], '')).filter(
                 (e) => e.path.rel.endsWith('.js'),
               );
-              updateData.additionalFiles = [];
               for (let i = 0; i < files.length; i++) {
                 const fileInfo = files[i];
                 const filePathParts = fileInfo.path.rel.split('/');
@@ -954,6 +974,13 @@ export class CMS {
                   }
                 }
               }
+            } else if (instance.additionalFiles) {
+              for (let i = 0; i < instance.additionalFiles.length; i++) {
+                const item = instance.additionalFiles[i];
+                updateData.additionalFiles.push({
+                  remove: item.path,
+                });
+              }
             }
           },
         },
@@ -961,11 +988,11 @@ export class CMS {
           title: 'Initialize jobs',
           task: async () => {
             const namespace = 'jobs';
+            updateData[namespace] = [];
             if (await fs.exist(['dist', namespace])) {
               const files = (await fs.readdir(['dist', namespace])).filter(
                 (e) => e.endsWith('.js'),
               );
-              updateData[namespace] = [];
               for (let i = 0; i < files.length; i++) {
                 const fileName = files[i];
                 const file = await fs.readString(['dist', namespace, fileName]);
@@ -997,6 +1024,15 @@ export class CMS {
                   });
                 }
               }
+            } else {
+              for (let i = 0; i < instance.jobs.length; i++) {
+                const item = instance.jobs[i];
+                if (item.external) {
+                  updateData[namespace].push({
+                    remove: item.hash,
+                  });
+                }
+              }
             }
           },
         },
@@ -1007,7 +1043,6 @@ export class CMS {
               const deps: InstanceDep[] = JSON.parse(
                 await fs.readString(['dist', 'deps.json']),
               );
-              console.log(deps);
               updateData.deps = deps.map((dep) => {
                 return {
                   add: dep,
