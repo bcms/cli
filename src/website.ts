@@ -41,7 +41,7 @@ export class Website {
         name: 'projectType',
         message: 'Select a framework',
         type: 'list',
-        choices: ['Next', 'Nuxt', 'Gatsby'],
+        choices: ['Next', 'Nuxt 3', 'Nuxt 2', 'Gatsby'],
         default: 'Next',
       },
     ]);
@@ -58,12 +58,19 @@ export class Website {
             `https://github.com/becomesco/cms-${
               answers.projectType === 'Next'
                 ? 'next'
-                : answers.projectType === 'Nuxt'
+                : answers.projectType === 'Nuxt 2' ||
+                  answers.projectType === 'Nuxt 3'
                 ? 'nuxt'
                 : 'gatsby'
             }-starter`,
             answers.projectName,
           ]);
+          if (answers.projectType === 'Nuxt 2') {
+            await ChildProcess.spawn('git', ['checkout', 'nuxt-2'], {
+              cwd: path.join(process.cwd(), answers.projectName),
+              stdio: 'inherit',
+            });
+          }
         },
       },
       {
