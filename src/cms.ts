@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as nodeFs from 'fs';
 import {
   createSdk3,
   createTasks,
@@ -32,7 +33,13 @@ import {
   createTerminalTitle,
   Terminal,
 } from './terminal';
-import { BCMSLanguage, BCMSMedia, BCMSMediaType } from '@becomes/cms-sdk/types';
+import {
+  BCMSLanguage,
+  BCMSMedia,
+  BCMSMediaType,
+  BCMSSocketEventName,
+} from '@becomes/cms-sdk/types';
+import type { Stream } from 'stream';
 
 const fs = createFS({
   base: process.cwd(),
@@ -236,6 +243,8 @@ export class CMS {
       await this.restore({ client, args });
     } else if (args.cms === 'create') {
       await this.create();
+    } else if (args.cms === 'dump') {
+      await this.dump({ args, client });
     }
   }
 
@@ -1185,6 +1194,163 @@ export class CMS {
     if (instance) {
       await createTasks(CMS.pullTasks(instance, repoFS, client)).run();
     }
+  }
+
+  static async dump({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    Terminal.pushComponent({
+      name: 'title',
+      component: createTerminalTitle({
+        state: {
+          text: 'Dump BCMS date',
+        },
+      }),
+    });
+    Terminal.render();
+    if (!(await client.isLoggedIn())) {
+      await login({ args, client });
+    }
+    if (await fs.exist('temp.zip', true)) {
+      await fs.deleteFile('temp.zip');
+    }
+    if (await fs.exist('temp')) {
+      await fs.deleteDir('temp');
+    }
+    const result = await Select.cloudOrLocal({ client });
+    const apiOrigin = result.cloud
+      ? `https://${
+          result.cloud.instance.domains[1]
+            ? result.cloud.instance.domains[1].name
+            : result.cloud.instance.domains[0].name
+        }`
+      : 'http://localhost:8080';
+    const sdk = createSdk3({
+      origin: apiOrigin,
+    });
+    const otp = await client.user.getOtp();
+    await sdk.shim.verify.otp(otp);
+    console.log(
+      'Creating data bundle.',
+      'Please wait, this might take a few minutes.',
+      'This depends on the BCMS data size.',
+    );
+    const backupPromise = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject('120s Timeout');
+      }, 120000);
+      const interval = setInterval(async () => {
+        if (backupItem) {
+          const list = await sdk.backup.list();
+          for (let i = 0; i < list.length; i++) {
+            const item = list[i];
+            if (backupItem._id === item._id) {
+              if (item.available) {
+                backupItem = item;
+                clearTimeout(timeout);
+                clearInterval(interval);
+                unsub();
+                resolve();
+                break;
+              }
+            }
+          }
+        }
+      }, 2000);
+      const unsub = sdk.socket.subscribe(
+        BCMSSocketEventName.BACKUP,
+        async (event) => {
+          console.log(event);
+          clearTimeout(timeout);
+          clearInterval(interval);
+          unsub();
+          resolve();
+        },
+      );
+    });
+    let backupItem = await sdk.backup.create({ media: true });
+    await backupPromise;
+    const downloadHash = await sdk.backup.getDownloadHash({
+      fileName: backupItem._id,
+    });
+    console.log('Downloading data ...');
+    const res = await Axios({
+      url: `${apiOrigin}/api/backup/${downloadHash}`,
+      responseType: 'stream',
+    });
+    const totalLength = parseInt(res.headers['content-length']);
+    let downloadedLength = 0;
+    const writer = nodeFs.createWriteStream(
+      path.join(process.cwd(), 'temp.zip'),
+    );
+    const data = res.data as Stream;
+    data.pipe(writer);
+    const progressName = 'Download data';
+    const progress = createTerminalProgressBar({
+      state: {
+        name: progressName,
+        progress: 0,
+      },
+    });
+    Terminal.pushComponent({
+      name: 'progress',
+      component: progress,
+    });
+    await new Promise<void>((resolve) => {
+      data.on('data', (chunk) => {
+        downloadedLength += chunk.length;
+        progress.update({
+          state: {
+            name: progressName,
+            progress: (100 / totalLength) * downloadedLength,
+          },
+        });
+        Terminal.render();
+      });
+      data.on('end', () => {
+        resolve();
+      });
+    });
+    Terminal.removeComponent('progress');
+    Terminal.render();
+    console.log('Unpacking data ...');
+    Zip.unzip({
+      location: path.join(process.cwd(), 'temp'),
+      buffer: await fs.read('temp.zip'),
+    });
+    Zip.unzip({
+      location: path.join(process.cwd(), 'temp', 'uploads'),
+      buffer: await fs.read(['temp', 'uploads.zip']),
+    });
+    if (await fs.exist('uploads')) {
+      await fs.deleteDir('uploads');
+    }
+    await fs.copy(['temp', 'uploads'], 'uploads');
+    if (await fs.exist('db')) {
+      await fs.deleteDir('db');
+    }
+    console.log('Transform data ...');
+    const files = await fs.readdir(['temp', 'db']);
+    for (let i = 0; i < files.length; i++) {
+      const fileName = files[i];
+      const items = JSON.parse(await fs.readString(['temp', 'db', fileName]));
+      const output: { [id: string]: any } = {};
+      for (let k = 0; k < items.length; k++) {
+        const item = items[k];
+        output[item._id] = item;
+      }
+      await fs.save(
+        ['db', 'bcms', fileName],
+        JSON.stringify(output, null, '  '),
+      );
+    }
+    console.log('Cleanup ...');
+    await fs.deleteFile('temp.zip');
+    await fs.deleteDir('temp');
   }
 
   static async create(): Promise<void> {
