@@ -246,10 +246,11 @@ export class Shim {
     client: ApiClient;
   }): Promise<void> {
     console.log('Check shim updates ...');
-    const newShimVersion = 'latest';
+    let newShimVersion = 'latest';
     const instance = (await client.instance.getAllLite())[0];
     if (instance) {
       args.version = await client.shim.version(instance._id);
+      newShimVersion = args.version;
     }
     const containersInfo = await Docker.container.list();
     const shimContainer = containersInfo.find((e) => e.names === 'bcms-shim');
