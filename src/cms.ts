@@ -1329,7 +1329,7 @@ export class CMS {
     if (await fs.exist('uploads')) {
       await fs.deleteDir('uploads');
     }
-    await fs.copy(['temp', 'uploads'], 'uploads');
+    await fs.copy(['temp', 'uploads', 'uploads'], 'uploads');
     if (await fs.exist('db')) {
       await fs.deleteDir('db');
     }
