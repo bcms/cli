@@ -166,6 +166,9 @@ export class Website {
             await repoFs.save(
               answers.projectType === 'Gatsby' ? '.env.development' : '.env',
               [
+                `VITE_BCMS_API_ORIGIN=${apiOrigin}`,
+                `VITE_BCMS_API_KEY=${apiKey._id}`,
+                '',
                 `BCMS_API_ORIGIN=${apiOrigin}`,
                 `BCMS_API_KEY=${apiKey._id}`,
                 `BCMS_API_SECRET=${apiKey.secret}`,
