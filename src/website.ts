@@ -167,12 +167,15 @@ export class Website {
               answers.projectType === 'Gatsby' ? '.env.development' : '.env',
               [
                 `VITE_BCMS_API_ORIGIN=${apiOrigin}`,
-                `VITE_BCMS_API_KEY=${apiKey._id}`,
+                `VITE_BCMS_PUB_API_KEY=${apiKey._id}`,
+                `VITE_BCMS_PUB_API_SECRET=${apiKey.secret}`,
                 '',
                 `BCMS_API_ORIGIN=${apiOrigin}`,
                 `BCMS_API_KEY=${apiKey._id}`,
                 `BCMS_API_SECRET=${apiKey.secret}`,
                 '',
+                'VITE_BCMS_ENABLE_CLIENT_CACHE=false',
+                'VITE_BCMS_CLIENT_DEBUG=false',
                 ...additionalEnvVars,
               ].join('\n'),
             );
