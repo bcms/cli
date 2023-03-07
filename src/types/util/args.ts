@@ -5,7 +5,7 @@ export interface Args {
   create?: boolean;
   function?: string;
   public?: boolean;
-  instance?: string;
+  instance?: 'install' | 'machine-install';
   run?: boolean;
   cms?: string;
   cloudOrigin?: string;
@@ -30,4 +30,7 @@ export interface Args {
   cmsClientApiSecret?: string;
   most?: string;
   website?: string;
+  licensePath?: string;
+
+  instanceId?: string;
 }

@@ -16,6 +16,8 @@ import { createTasks } from '@banez/npm-tool';
 import { createFS } from '@banez/fs';
 import type { Args } from './types';
 import { StringUtility } from '@banez/string-utility';
+import { ObjectUtility } from '@becomes/purple-cheetah';
+import { ObjectUtilityError } from '@becomes/purple-cheetah/types';
 
 export class Instance {
   static async resolve({
@@ -25,10 +27,242 @@ export class Instance {
     args: Args;
     client: ApiClient;
   }): Promise<void> {
-    if (args.install) {
+    if (args.instance === 'install' || args.install) {
       await this.install({ args, client });
+    } else if (args.instance === 'machine-install') {
+      await this.machineInstall({ args, client });
     }
   }
+
+  static async machineInstall({
+    args,
+    client,
+  }: {
+    args: Args;
+    client: ApiClient;
+  }): Promise<void> {
+    if (!(await DockerUtil.setup({ args }))) {
+      return;
+    }
+    const checkArgs = ObjectUtility.compareWithSchema(
+      args,
+      {
+        licensePath: {
+          __type: 'string',
+          __required: true,
+        },
+        instanceId: {
+          __type: 'string',
+          __required: true,
+        },
+      },
+      'args',
+    );
+    if (checkArgs instanceof ObjectUtilityError) {
+      throw Error(checkArgs.message);
+    }
+    const license = {
+      fileName: `${args.instanceId}.license`,
+      value: await Config.server.linux.homeFs.readString(
+        args.licensePath || '',
+      ),
+    };
+    const instanceFsBase =
+      Config.server.linux.homeBase + `/storage/${args.instanceId}`;
+    const instanceFs = createFS({
+      base: instanceFsBase,
+    });
+    if (!(await instanceFs.exist('mongodb'))) {
+      await instanceFs.mkdir('mongodb');
+    }
+    if (!(await instanceFs.exist('fsdb'))) {
+      await instanceFs.mkdir('fsdb');
+    }
+    await createTasks([
+      {
+        title: 'Verify BCMS license',
+        async task() {
+          if (
+            license.value.indexOf('---- BEGIN BCMS LICENSE ----') === -1 ||
+            license.value.indexOf('---- END BCMS LICENSE ----') === -1 ||
+            license.value.split('\n').length !== 23
+          ) {
+            throw Error(
+              [
+                `Invalid license format of "${license.fileName}".`,
+                'If you did not change the license file and you obtained it',
+                'via "https://cloud.thebcms.com", please contact the support.',
+              ].join(' '),
+            );
+          }
+        },
+      },
+      {
+        title: 'Prepare BCMS directory.',
+        async task() {
+          await Config.server.linux.homeFs.save(
+            ['licenses', license.fileName],
+            license.value,
+          );
+        },
+      },
+      {
+        title: 'Setup Docker network',
+        async task() {
+          const exo: ChildProcessOnChunkHelperOutput = {
+            out: '',
+            err: '',
+          };
+          await ChildProcess.advancedExec(
+            [
+              'docker',
+              'network',
+              'create',
+              '-d',
+              'bridge',
+              '--subnet',
+              '10.20.30.0/16',
+              '--ip-range',
+              '10.20.30.128/24',
+              '--gateway',
+              '10.20.30.1',
+              'bcms',
+            ].join(' '),
+            {
+              onChunk: ChildProcess.onChunkHelper(exo),
+              doNotThrowError: true,
+            },
+          ).awaiter;
+          if (exo.err) {
+            if (!exo.err.includes('network with name bcms already exists')) {
+              throw Error(
+                [
+                  '[e1] Cannot create "bcms" docker network.',
+                  'You will need to create it manually. ---',
+                  exo.err,
+                ].join(' '),
+              );
+            }
+          } else if (!exo.out) {
+            throw Error(
+              [
+                '[e2] Cannot create "bcms" docker network.',
+                'You will need to create it manually.',
+              ].join(' '),
+            );
+          }
+        },
+      },
+      {
+        title: 'Setup database',
+        async task() {
+          let setupDb = true;
+          if (await instanceFs.exist('db-info.json', true)) {
+            const { yes } = await prompt<{ yes: boolean }>([
+              {
+                message: [
+                  'Database information detected.',
+                  'Would you like to setup database again?',
+                  'This will delete current database and setup a new one!',
+                ].join(' '),
+                type: 'confirm',
+                name: 'yes',
+              },
+            ]);
+            setupDb = yes;
+          }
+          if (setupDb) {
+            const dbContainerName = `bcms-db-${args.instanceId}`;
+            const dbInfo: {
+              type: string;
+              user: string;
+              pass: string;
+              name: string;
+              cluster?: string;
+              host?: string;
+              port?: string;
+            } = {
+              type: 'auto',
+              user: 'u_' + randomBytes(8).toString('hex'),
+              pass: 'p_' + randomBytes(16).toString('hex'),
+              name: 'admin',
+              host: dbContainerName,
+              port: '27017',
+            };
+            if (!(await Docker.image.exists('mongo:5-focal'))) {
+              await Docker.image.pull('mongo:5-focal');
+            }
+            await instanceFs.copy(
+              'mongodb',
+              `mongodb_${new Date().toISOString()}_bak`,
+            );
+            await instanceFs.deleteDir('mongodb');
+            await instanceFs.mkdir('mongodb');
+            if (await Docker.container.exists(dbContainerName)) {
+              await Docker.container.stop(dbContainerName);
+              await Docker.container.remove(dbContainerName);
+            }
+            await Docker.container.run({
+              args: {
+                '--name': dbContainerName,
+                '-d': [],
+                '--network': 'bcms',
+                '-e': [
+                  `MONGO_INITDB_ROOT_USERNAME=${dbInfo.user}`,
+                  `MONGO_INITDB_ROOT_PASSWORD=${dbInfo.pass}`,
+                ],
+                '-v': `${instanceFsBase}/mongodb:/data/db`,
+                'mongo:5-focal': [],
+              },
+            });
+            const cronFile = `/var/spool/cron/crontabs/root`;
+            let fileContent = '';
+            if (!(await Config.server.linux.homeFs.exist(cronFile, true))) {
+              await ChildProcess.advancedExec([
+                'touch',
+                cronFile,
+                '&&',
+                `chmod 600 ${cronFile}`,
+              ]).awaiter;
+            } else {
+              fileContent = await Config.server.linux.homeFs.readString(
+                cronFile,
+              );
+            }
+            const dbPart = StringUtility.textBetween(
+              fileContent,
+              `# ---- DB ${dbContainerName} ----\n`,
+              `\n# ---- DB END ${dbContainerName}`,
+            );
+            if (dbPart) {
+              fileContent = fileContent.replace(
+                dbPart,
+                [
+                  `@reboot sudo docker start ${dbContainerName}`,
+                  `* * * * * sudo docker start ${dbContainerName}`,
+                ].join('\n'),
+              );
+            } else {
+              fileContent += [
+                `# ---- DB ${dbContainerName} ----`,
+                `@reboot sudo docker start ${dbContainerName}`,
+                `* * * * * sudo docker start ${dbContainerName}`,
+                `# ---- DB END ${dbContainerName}\n`,
+              ].join('\n');
+            }
+            await Config.server.linux.homeFs.save(cronFile, fileContent);
+
+            await instanceFs.save(
+              'db-info.json',
+              JSON.stringify(dbInfo, null, '  '),
+            );
+          }
+        },
+      },
+    ]).run();
+    await Shim.install({ args, client });
+  }
+
   static async install({
     args,
     client,
@@ -40,16 +274,17 @@ export class Instance {
       await login({ args, client });
     }
 
-    if (!(await DockerUtil.setup())) {
+    if (!(await DockerUtil.setup({ args }))) {
       return;
     }
 
     /**
      * Get license
      */
+
     const instances = await client.instance.getAll();
-    let instance: InstanceProtected = args.instance
-      ? (instances.find((e) => e._id === args.instance) as InstanceProtected)
+    let instance: InstanceProtected = args.instanceId
+      ? (instances.find((e) => e._id === args.instanceId) as InstanceProtected)
       : (null as never);
     let org: Org | null = null;
     if (instance) {

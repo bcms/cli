@@ -1,9 +1,10 @@
 import { ChildProcess } from '@banez/child_process';
 import { createTasks } from '@banez/npm-tool';
 import { prompt } from 'inquirer';
+import type { Args } from '../types';
 
 export class DockerUtil {
-  static async setup(): Promise<boolean> {
+  static async setup({ args }: { args: Args }): Promise<boolean> {
     const rexo = {
       out: '',
       err: '',
@@ -14,16 +15,19 @@ export class DockerUtil {
     }).awaiter;
     if (rexo.err) {
       if (rexo.err.indexOf('not found')) {
-        const installDockerResult = await prompt<{ yes: boolean }>([
-          {
-            type: 'confirm',
-            name: 'yes',
-            message: [
-              'Docker is not installed on the system.',
-              'BCMS required Docker to run. We can install it for you.',
-            ].join(' '),
-          },
-        ]);
+        const installDockerResult =
+          args.instance === 'machine-install'
+            ? { yes: true }
+            : await prompt<{ yes: boolean }>([
+                {
+                  type: 'confirm',
+                  name: 'yes',
+                  message: [
+                    'Docker is not installed on the system.',
+                    'BCMS required Docker to run. We can install it for you.',
+                  ].join(' '),
+                },
+              ]);
         if (!installDockerResult.yes) {
           console.log(
             [
@@ -139,17 +143,20 @@ export class DockerUtil {
                 console.log('Docker is successfully installed and running');
               } else {
                 console.log(exo.out);
-                const cont = await prompt<{ yes: boolean }>([
-                  {
-                    type: 'confirm',
-                    name: 'yes',
-                    message: [
-                      'It seams that the Docker was installed',
-                      'but output cannot be verified.',
-                      'Would you like to continue?',
-                    ].join(' '),
-                  },
-                ]);
+                const cont =
+                  args.instance === 'machine-install'
+                    ? { yes: false }
+                    : await prompt<{ yes: boolean }>([
+                        {
+                          type: 'confirm',
+                          name: 'yes',
+                          message: [
+                            'It seams that the Docker was installed',
+                            'but output cannot be verified.',
+                            'Would you like to continue?',
+                          ].join(' '),
+                        },
+                      ]);
                 if (!cont.yes) {
                   throw Error(
                     'Failed to install the Docker. Probably partially installed.',

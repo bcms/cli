@@ -32,16 +32,14 @@ export class Shim {
     args: Args;
     client: ApiClient;
   }): Promise<void> {
-    if (!args.version) {
-      const instance = (await client.instance.getAllLite())[0];
-      if (!instance) {
-        args.version = 'latest';
-      } else {
-        args.version = await client.shim.version(instance._id);
-      }
+    let dockerImageVersion = 'latest';
+    if (args.instanceId) {
+      dockerImageVersion = await client.shim.version(
+        args.instanceId || '____none',
+      );
     }
 
-    if (!(await DockerUtil.setup())) {
+    if (!(await DockerUtil.setup({ args }))) {
       return;
     }
 
@@ -121,7 +119,7 @@ export class Shim {
         async task() {
           await ChildProcess.spawn('docker', [
             'pull',
-            `becomes/cms-shim:${args.version}`,
+            `becomes/cms-shim:${dockerImageVersion}`,
           ]);
         },
       },
@@ -183,7 +181,7 @@ export class Shim {
               'bcms-shim',
               '--hostname',
               'bcms-shim',
-              `becomes/cms-shim:${args.version}`,
+              `becomes/cms-shim:${dockerImageVersion}`,
               '&&',
               'ls -l',
             ].join(' '),
@@ -246,12 +244,9 @@ export class Shim {
     client: ApiClient;
   }): Promise<void> {
     console.log('Check shim updates ...');
-    let newShimVersion = 'latest';
-    const instance = (await client.instance.getAllLite())[0];
-    if (instance) {
-      args.version = await client.shim.version(instance._id);
-      newShimVersion = args.version;
-    }
+    const newShimVersion = await client.shim.version(
+      args.instanceId || '____none',
+    );
     const containersInfo = await Docker.container.list();
     const shimContainer = containersInfo.find((e) => e.names === 'bcms-shim');
     if (!shimContainer) {

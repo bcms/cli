@@ -136,6 +136,12 @@ export function parseArgs(rawArgs: string[]): Args {
     website: {
       type: 'string',
     },
+    licensePath: {
+      type: 'string',
+    },
+    instanceId: {
+      type: 'string',
+    },
   };
   const groups: {
     [name: string]: {
@@ -231,6 +237,10 @@ export function parseArgs(rawArgs: string[]): Args {
     '--h': groups.help.name,
 
     '--website': groups.website.name,
+
+    '--license-path': groups.licensePath.name,
+
+    '--instance-id': groups.instanceId.name,
   };
   const output: {
     [name: string]: string | boolean | undefined;
