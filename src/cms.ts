@@ -1093,7 +1093,7 @@ export class CMS {
         task: async () => {
           await ChildProcess.spawn('git', [
             'clone',
-            'https://github.com/becomesco/cms',
+            'https://github.com/bcms/cms',
             repoName,
           ]);
           // TODO: Remove this line when ready for production
@@ -1375,7 +1375,7 @@ export class CMS {
         task: async () => {
           await ChildProcess.spawn('git', [
             'clone',
-            'https://github.com/becomesco/cms',
+            'https://github.com/bcms/cms',
             answers.projectName,
           ]);
         },

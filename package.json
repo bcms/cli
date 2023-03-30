@@ -1,6 +1,6 @@
 {
   "name": "@becomes/cms-cli",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "CLI to help you with BCMS development.",
   "author": "becomes.co",
   "license": "MIT",
@@ -66,12 +66,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/becomesco/cms-cli.git"
+    "url": "git+https://github.com/bcms/cli.git"
   },
   "bugs": {
-    "url": "https://github.com/becomesco/cms-cli/issues"
+    "url": "https://github.com/bcms/cli/issues"
   },
-  "homepage": "https://github.com/becomesco/cms-cli#readme",
+  "homepage": "https://github.com/bcms/cli#readme",
   "bin": {
     "bcms": "bin/bcms.js"
   },

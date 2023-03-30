@@ -343,7 +343,7 @@ export class Plugin {
             'git',
             [
               'clone',
-              'https://github.com/becomesco/cms-plugin-starter',
+              'https://github.com/bcms/plugin-starter',
               formattedProjectName,
             ],
             {

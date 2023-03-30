@@ -55,7 +55,7 @@ export class Website {
         task: async () => {
           await ChildProcess.spawn('git', [
             'clone',
-            `https://github.com/becomesco/cms-${
+            `https://github.com/bcms/${
               answers.projectType === 'Next'
                 ? 'next'
                 : answers.projectType === 'Nuxt 2' ||

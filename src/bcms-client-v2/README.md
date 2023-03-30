@@ -1,6 +1,6 @@
 # Becomes CMS client library
 
-This library was written to enable easy connectivity with [Becomes CMS](https://github.com/becomesco/cms).
+This library was written to enable easy connectivity with [Becomes CMS](https://github.com/bcms/cms).
 
 [![CircleCI](https://circleci.com/gh/becomesco/cms-client/tree/master.svg?style=svg)](https://circleci.com/gh/becomesco/cms-client/tree/master)
 

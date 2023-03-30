@@ -13,10 +13,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/becomesco/cms-client.git"
+    "url": "git+https://github.com/bcms/client.git"
   },
   "bugs": {
-    "url": "https://github.com/becomesco/cms-client/issues"
+    "url": "https://github.com/bcms/client/issues"
   },
-  "homepage": "https://github.com/becomesco/cms-client#readme"
+  "homepage": "https://github.com/bcms/client#readme"
 }
