@@ -3,7 +3,7 @@ export const FunctionTemplates = {
     return `
 import {createBcmsFunction} from '@becomes/cms-backend/function'
 
-export default createBcmsFunction(() => {
+export default createBcmsFunction(async () => {
   return {
     config: {
       name: '${data.name}',

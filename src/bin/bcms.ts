@@ -172,6 +172,20 @@ async function main() {
     await Website.resolve({ args, client });
   } else if (args.help) {
     await help();
+  } else if (typeof args.version === 'string') {
+    let packageJson: any;
+    if (await rootFs.exist(path.join(__dirname, '..', 'package.json'), true)) {
+      packageJson = JSON.parse(
+        await rootFs.readString(path.join(__dirname, '..', 'package.json')),
+      );
+    } else {
+      packageJson = JSON.parse(
+        await rootFs.readString(
+          path.join(__dirname, '..', '..', 'package.json'),
+        ),
+      );
+    }
+    console.log('BCMS CLI version ------>', packageJson.version);
   }
   setTimeout(() => {
     process.exit(0);

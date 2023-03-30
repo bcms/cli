@@ -52,14 +52,8 @@ export function parseArgs(rawArgs: string[]): Args {
     bundle: {
       type: 'boolean',
     },
-    plugin: {
-      type: 'string',
-    },
     create: {
       type: 'boolean',
-    },
-    function: {
-      type: 'string',
     },
     public: {
       type: 'boolean',
@@ -142,6 +136,19 @@ export function parseArgs(rawArgs: string[]): Args {
     instanceId: {
       type: 'string',
     },
+
+    function: {
+      type: 'string',
+    },
+    event: {
+      type: 'string',
+    },
+    job: {
+      type: 'string',
+    },
+    plugin: {
+      type: 'string',
+    },
   };
   const groups: {
     [name: string]: {
@@ -166,14 +173,9 @@ export function parseArgs(rawArgs: string[]): Args {
     '--bundle': groups.bundle.name,
     '--b': groups.bundle.name,
 
-    '--plugin': groups.plugin.name,
-    '--pl': groups.plugin.name,
 
     '--create': groups.create.name,
     '--c': groups.create.name,
-
-    '--function': groups.function.name,
-    '--f': groups.function.name,
 
     '--public': groups.public.name,
     '--p': groups.public.name,
@@ -241,6 +243,13 @@ export function parseArgs(rawArgs: string[]): Args {
     '--license-path': groups.licensePath.name,
 
     '--instance-id': groups.instanceId.name,
+
+    '--function': groups.function.name,
+    '--f': groups.function.name,
+    '--event': groups.event.name,
+    '--job': groups.job.name,
+    '--plugin': groups.plugin.name,
+    '--pl': groups.plugin.name,
   };
   const output: {
     [name: string]: string | boolean | undefined;

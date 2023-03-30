@@ -3,7 +3,6 @@ export interface Args {
   bundle?: boolean;
   plugin?: string;
   create?: boolean;
-  function?: string;
   public?: boolean;
   instance?: 'install' | 'machine-install';
   run?: boolean;
@@ -33,4 +32,8 @@ export interface Args {
   licensePath?: string;
 
   instanceId?: string;
+
+  function?: 'create';
+  event?: 'create';
+  job?: 'create';
 }
