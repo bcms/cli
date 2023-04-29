@@ -64,11 +64,11 @@ import {
   createTerminalList,
   createTerminalTitle,
 } from '../terminal';
-import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import type { FS } from '@banez/fs/types';
 import { ObjectUtility } from '@banez/object-utility';
 import { ObjectUtilityError } from '@banez/object-utility/types';
 import { CMS } from '../cms';
+import type { BCMSCloudSdk } from '@becomes/cms-cloud-client';
 
 function nodeToText({ node }: { node: EntryV3ContentNode }) {
   let output = '';
@@ -169,7 +169,7 @@ export class Migration {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
     rootFs: FS;
   }): Promise<void> {
     let migrationConfig: MigrationConfig = {} as never;
@@ -1541,7 +1541,7 @@ export class Migration {
     v3Push(data: {
       args: Args;
       migrationConfig: MigrationConfig;
-      client: ApiClient;
+      client: BCMSCloudSdk;
     }): Promise<void>;
   } {
     return {

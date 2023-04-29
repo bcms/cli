@@ -1,25 +1,29 @@
 import * as open from 'open';
 import { prompt } from 'inquirer';
-import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import type { Args } from './types';
 import { EventManager } from './event';
+import type { BCMSCloudSdk } from '@becomes/cms-cloud-client';
 
 export async function login({
   client,
   args,
 }: {
   args: Args;
-  client: ApiClient;
+  client: BCMSCloudSdk;
 }): Promise<void> {
-  if (await client.isLoggedIn()) {
-    try {
-      await client.auth.logout();
-    } catch (error) {
-      console.warn('Failed to logout previous user...');
+  try {
+    if (await client.isLoggedIn()) {
+      try {
+        await client.auth.logout();
+      } catch (error) {
+        console.warn('Failed to logout previous user...');
+      }
     }
+  } catch (error) {
+    // Ignore error
   }
   if (args.otp) {
-    await client.auth.loginOtp(args.otp);
+    await client.auth.loginOtp({ otp: args.otp, userId: args.userId || '' });
     console.log('You are now logged in to the BCMS Cloud.');
   } else if (args.terminalLogin) {
     const result = await prompt<{ email: string; password: string }>([
@@ -34,7 +38,7 @@ export async function login({
         name: 'password',
       },
     ]);
-    await client.auth.login(result.email, result.password);
+    await client.auth.login({ email: result.email, password: result.password });
     console.log('You are now logged in to the BCMS Cloud.');
   } else {
     const url = `${args.cloudOrigin}/login?type=cb&d=${Buffer.from(

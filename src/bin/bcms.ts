@@ -2,12 +2,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import { createStorage } from '@becomes/cms-cloud-client';
-import type {
-  Storage,
-  StorageSubscriptionHandler,
-} from '@becomes/cms-cloud-client/types';
 import { createCloudApiClient } from '../cloud-client';
 import { CMS } from '../cms';
 import { Function } from '../function';
@@ -43,92 +37,11 @@ async function main() {
   if (!args.cloudOrigin) {
     args.cloudOrigin = 'https://cloud.thebcms.com';
   }
-  const storageFilePath = path.join(Config.fsDir, 'cli-db.json');
-  const storage = createStorage(() => {
-    const store: {
-      [key: string]: any;
-    } = {};
-    const subs: {
-      [id: string]: {
-        key: string;
-        handler: StorageSubscriptionHandler<unknown>;
-      };
-    } = {};
-
-    async function save() {
-      await fs.save(storageFilePath, JSON.stringify(store, null, '  '));
-    }
-    async function triggerSubs(
-      key: string,
-      value: any,
-      type: 'set' | 'remove',
-    ) {
-      const ids = Object.keys(subs);
-      for (let i = 0; i < ids.length; i++) {
-        const sub = subs[ids[i]];
-        if (sub.key === key) {
-          await sub.handler(value, type);
-        }
-      }
-    }
-
-    const self: Storage & {
-      init(data: any): void;
-    } = {
-      init(data) {
-        for (const key in data) {
-          store[key] = data[key];
-        }
-      },
-      async clear() {
-        const keys = Object.keys(store);
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          await self.remove(key);
-        }
-      },
-      async set(key, value) {
-        store[key] = value;
-        await save();
-        await triggerSubs(key, value, 'set');
-        return true;
-      },
-      async remove(key) {
-        let value: any;
-        if (store[key]) {
-          if (typeof store[key] === 'object') {
-            value = JSON.parse(JSON.stringify(store[key]));
-          } else {
-            value = store[key];
-          }
-        }
-        delete store[key];
-        await save();
-        triggerSubs(key, value, 'remove');
-      },
-      get(key) {
-        return store[key];
-      },
-      subscribe(key, handler) {
-        const id = uuidv4();
-        subs[id] = { key, handler: handler as never };
-        return () => {
-          delete subs[id];
-        };
-      },
-    };
-    return self;
-  });
   if (!(await fs.exist(Config.fsDir))) {
     await fs.mkdir(Config.fsDir);
   }
-  if (!(await fs.exist(storageFilePath, true))) {
-    await fs.save(storageFilePath, '{}');
-  }
-  (storage as any).init(JSON.parse(await fs.readString(storageFilePath)));
-  const client = createCloudApiClient({
+  const client = await createCloudApiClient({
     args,
-    storage,
   });
   await new Promise<PurpleCheetah>((resolve, reject) => {
     try {
@@ -136,6 +49,14 @@ async function main() {
         port: 1278,
         silentLogs: true,
         staticContentDir: path.join(__dirname, '..', 'public'),
+        logger: {
+          doNotOverrideProcess: true,
+          silentLogger: true,
+          saveToFile: {
+            interval: 1000,
+            output: path.join(Config.fsDir, 'logs'),
+          },
+        },
         middleware: [
           createCorsMiddleware(),
           createBodyParserMiddleware(),

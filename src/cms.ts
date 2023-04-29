@@ -1,5 +1,4 @@
 import * as path from 'path';
-import * as crypto from 'crypto';
 import * as nodeFs from 'fs';
 import {
   createSdk3,
@@ -10,22 +9,11 @@ import {
   Select,
   Zip,
 } from './util';
-import {
-  ApiClient,
-  InstanceDep,
-  InstanceFJEType,
-  InstanceProtected,
-  InstanceUpdateData,
-  Org,
-} from '@becomes/cms-cloud-client/types';
 import { login } from './login';
 import { prompt } from 'inquirer';
 import { ChildProcess } from '@banez/child_process';
 import { createFS } from '@banez/fs';
-import { StringUtility } from '@banez/string-utility';
 import type { Args } from './types';
-import type { Task } from '@banez/npm-tool/types';
-import type { FS } from '@banez/fs/types';
 import Axios from 'axios';
 import {
   createTerminalList,
@@ -40,203 +28,29 @@ import {
   BCMSSocketEventName,
 } from '@becomes/cms-sdk/types';
 import type { Stream } from 'stream';
+import type {
+  BCMSCloudSdk,
+  InstanceDep,
+  InstanceFJEType,
+  InstanceProtectedWithStatus,
+} from '@becomes/cms-cloud-client';
 
 const fs = createFS({
   base: process.cwd(),
 });
 
 export class CMS {
-  private static replaceCloudComments(data: string): string {
-    return data
-      .replace(/\/\/ ----%GLOBAL_START%----/g, '')
-      .replace(/\/\/ ----%GLOBAL_END%----/g, '')
-      .replace(/\/\*----%PUBLIC_START%----\*\//g, '')
-      .replace(/\/\*----%PUBLIC_END%----\*\//g, '')
-      .replace(/\/\/ ----%CODE_START%----/g, '')
-      .replace(/\/\/ ----%CODE_END%----/g, '')
-      .replace(/\/\*----%CONFIG_METHOD_START%----\*\//g, '')
-      .replace(/\/\*----%CONFIG_METHOD_END%----\*\//g, '')
-      .replace(/\/\*----%CONFIG_SCOPE_START%----\*\//g, '')
-      .replace(/\/\*----%CONFIG_SCOPE_END%----\*\//g, '')
-      .replace(/\/\*----%MAIN_START%----\*\//g, '')
-      .replace(/\/\*----%MAIN_END%----\*\//g, '')
-      .replace(/\/\*----%CRON_MIN_START%----\*\//g, '')
-      .replace(/\/\*----%CRON_MIN_END%----\*\//g, '')
-      .replace(/\/\*----%CRON_HOUR_START%----\*\//g, '')
-      .replace(/\/\*----%CRON_HOUR_END%----\*\//g, '')
-      .replace(/\/\*----%CRON_DOM_START%----\*\//g, '')
-      .replace(/\/\*----%CRON_DOM_END%----\*\//g, '')
-      .replace(/\/\*----%CRON_MON_START%----\*\//g, '')
-      .replace(/\/\*----%CRON_MON_END%----\*\//g, '')
-      .replace(/\/\*----%CRON_DOW_START%----\*\//g, '')
-      .replace(/\/\*----%CRON_DOW_END%----\*\//g, '');
-  }
-
-  private static pullTasks(
-    instance: InstanceProtected,
-    repoFS: FS,
-    client: ApiClient,
-  ): Task[] {
-    const localFilesMessage = [
-      '/**',
-      ' * IMPORTANT: This file comes from BCMS Cloud UI.',
-      ' * If you want to edit this function do it from the',
-      ' * Cloud UI because any changes to this file locally',
-      ' * will not take place in the Cloud.',
-      ' */',
-      '',
-    ].join('\n');
-    return [
-      {
-        title: 'Save functions',
-        task: async () => {
-          for (let i = 0; i < instance.functions.length; i++) {
-            const item = instance.functions[i];
-            await repoFS.save(
-              ['src', 'functions', '__' + item.name + '.js'],
-              localFilesMessage +
-                CMS.replaceCloudComments(
-                  Buffer.from(item.code, 'base64').toString(),
-                ),
-            );
-          }
-        },
-      },
-      {
-        title: 'Save jobs',
-        task: async () => {
-          for (let i = 0; i < instance.jobs.length; i++) {
-            const item = instance.jobs[i];
-            await repoFS.save(
-              ['src', 'jobs', '__' + item.name + '.js'],
-              localFilesMessage +
-                CMS.replaceCloudComments(
-                  Buffer.from(item.code, 'base64').toString(),
-                ),
-            );
-          }
-        },
-      },
-      {
-        title: 'Save events',
-        task: async () => {
-          for (let i = 0; i < instance.events.length; i++) {
-            const item = instance.events[i];
-            await repoFS.save(
-              ['src', 'events', '__' + item.name + '.js'],
-              localFilesMessage +
-                CMS.replaceCloudComments(
-                  Buffer.from(item.code, 'base64').toString(),
-                ),
-            );
-          }
-        },
-      },
-      {
-        title: 'Save plugins',
-        task: async () => {
-          const bcmsConfig = await repoFS.readString('bcms.config.js');
-          const rawPluginList = StringUtility.textBetween(
-            bcmsConfig,
-            'plugins: [',
-            ']',
-          );
-          const inject = !bcmsConfig.includes('plugins: [');
-          const pluginList = rawPluginList
-            .split(',')
-            .map((e) =>
-              e
-                .replace(/ /g, '')
-                .replace(/\n/g, '')
-                .replace(/\r/g, '')
-                .replace(/\t/g, '')
-                .replace(/'/g, '')
-                .replace(/"/g, ''),
-            )
-            .filter((e) => e);
-          for (let i = 0; i < instance.plugins.length; i++) {
-            const item = instance.plugins[i];
-            const pluginData = await client.media.get.instancePlugin({
-              orgId: instance.org.id,
-              instanceId: instance._id,
-              pluginId: item.id,
-            });
-            await repoFS.save(['plugins', item.id], pluginData);
-            if (!pluginList.find((e) => e === item.tag)) {
-              pluginList.push(item.tag);
-            }
-          }
-          await repoFS.save(
-            'bcms.config.js',
-            inject
-              ? bcmsConfig.replace(
-                  'module.exports = createBcmsConfig({',
-                  `module.exports = createBcmsConfig({\n  plugins: [${pluginList
-                    .map((e) => `'${e}'`)
-                    .join(', ')}],`,
-                )
-              : bcmsConfig.replace(
-                  `plugins: [${rawPluginList}`,
-                  'plugins: [' + pluginList.map((e) => `'${e}'`).join(', '),
-                ),
-          );
-        },
-      },
-      {
-        title: 'Add Cloud files to ignore',
-        task: async () => {
-          const startComment = '// ---- BCMS Cloud files - start ----\n';
-          const endComment = '\n// ---- BCMS Cloud files - end ----';
-          const ignoreFiles = [
-            instance.functions
-              .map((e) => `src/functions/__${e.name}.js`)
-              .join('\n'),
-            instance.events.map((e) => `src/events/__${e.name}.js`).join('\n'),
-            instance.jobs.map((e) => `src/jobs/__${e.name}.js`).join('\n'),
-          ].join('\n');
-          let eslintIgnore = await repoFS.readString('.eslintignore');
-          let gitIgnore = await repoFS.readString('.gitignore');
-          const esInject = StringUtility.textBetween(
-            eslintIgnore,
-            startComment,
-            endComment,
-          );
-          if (esInject) {
-            eslintIgnore = eslintIgnore.replace(esInject, ignoreFiles);
-          } else {
-            eslintIgnore +=
-              `\n${startComment}` + ignoreFiles + `${endComment}\n`;
-          }
-          const gitInject = StringUtility.textBetween(
-            gitIgnore,
-            startComment,
-            endComment,
-          );
-          if (gitInject) {
-            gitIgnore = gitIgnore.replace(gitInject, ignoreFiles);
-          } else {
-            gitIgnore += `\n${startComment}` + ignoreFiles + `${endComment}\n`;
-          }
-          await repoFS.save('.eslintignore', eslintIgnore);
-          await repoFS.save('.gitignore', gitIgnore);
-        },
-      },
-    ];
-  }
-
   static async resolve({
     args,
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (args.cms === 'bundle') {
       await this.bundle();
     } else if (args.cms === 'deploy') {
       await this.deploy({ args, client });
-    } else if (args.cms === 'clone') {
-      await this.clone({ args, client });
     } else if (args.cms === 'backup') {
       await this.backup({ client, args });
     } else if (args.cms === 'restore') {
@@ -253,7 +67,7 @@ export class CMS {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     const titleComponent = createTerminalTitle({
       state: {
@@ -305,19 +119,14 @@ export class CMS {
         buffer: await tmpFs.read('uploads.zip'),
       });
     }
-    const { org, instance } = await Select.orgAndInstance({ client });
+    const { instance } = await Select.instance({ client });
     titleComponent.update({
       state: {
-        text: `BCMS Backup - ${org.name}, ${instance.name}`,
+        text: `BCMS Backup - ${instance.name}`,
       },
     });
     Terminal.render();
-    const origin =
-      'https://' +
-      (instance.domains[1]
-        ? instance.domains[1].name
-        : instance.domains[0].name);
-    // const origin = 'http://localhost:8080';
+    const origin = await Select.instanceDomain({ instance, client });
     const sdk3 = createSdk3({
       origin,
     });
@@ -344,7 +153,7 @@ export class CMS {
     ]);
     const { confirm } = await prompt<{ confirm: boolean }>([
       {
-        message: `Are you sure you want to restore data to: ${org.name}, ${instance.name}?`,
+        message: `Are you sure you want to restore data to: ${instance.name}?`,
         type: 'confirm',
         name: 'confirm',
       },
@@ -583,7 +392,7 @@ export class CMS {
     client,
     args,
   }: {
-    client: ApiClient;
+    client: BCMSCloudSdk;
     args: Args;
   }): Promise<void> {
     const titleComponent = createTerminalTitle({
@@ -599,19 +408,19 @@ export class CMS {
       await login({ args, client });
     }
     Terminal.render();
-    const { org, instance } = await Select.orgAndInstance({ client });
+    const { instance } = await Select.instance({ client });
     titleComponent.update({
       state: {
-        text: `BCMS Backup - ${org.name}, ${instance.name}`,
+        text: `BCMS Backup - ${instance.name}`,
       },
     });
-    const origin = 'https://' + instance.domains[0];
-    // const origin = 'http://localhost:8080';
+    const origin = await Select.instanceDomain({ instance, client });
     const sdk3 = createSdk3({
       origin,
     });
     const otp = await client.user.getOtp();
-    await sdk3.shim.verify.otp(otp);
+    const user = await client.user.get();
+    await sdk3.shim.verify.otp(`${user._id}_${otp}`);
     const hash = await sdk3.backup.create({
       media: true,
     });
@@ -684,50 +493,6 @@ export class CMS {
           }
         },
       },
-      // {
-      //   title: 'Copy local plugins',
-      //   async task() {
-      //     const bcmsConfig = await fs.readString('bcms.config.js');
-      //     const pluginString = StringUtility.textBetween(
-      //       bcmsConfig,
-      //       'plugins: [',
-      //       ']',
-      //     );
-      //     const plugins = pluginString
-      //       .split(',')
-      //       .filter((e) => e)
-      //       .map((e) => {
-      //         const raw = e
-      //           .replace(/'/g, '')
-      //           .replace(/"/g, '')
-      //           .replace(/ /g, '')
-      //           .replace(/\n/g, '');
-      //         return {
-      //           formatted: raw.replace(/@/g, '').replace(/\//g, '-'),
-      //           raw,
-      //         };
-      //       });
-      //     if (plugins.length > 0) {
-      //       const pluginList: string[] = [];
-      //       for (let i = 0; i < plugins.length; i++) {
-      //         const pluginName = plugins[i].formatted + '.tgz';
-      //         if (await fs.exist(['plugins', pluginName], true)) {
-      //           pluginList.push(plugins[i].raw);
-      //           await fs.copy(
-      //             ['plugins', pluginName],
-      //             ['dist', 'plugins', pluginName],
-      //           );
-      //         }
-      //       }
-      //       if (pluginList.length > 0) {
-      //         await fs.save(
-      //           ['dist', 'plugin-list.json'],
-      //           JSON.stringify(pluginList),
-      //         );
-      //       }
-      //     }
-      //   },
-      // },
       {
         title: 'Find dependencies',
         async task() {
@@ -736,6 +501,10 @@ export class CMS {
           if (packageJson.dependencies) {
             for (const depName in packageJson.dependencies) {
               deps.push({
+                _id: '',
+                createdAt: 0,
+                updatedAt: 0,
+                instanceId: '',
                 name: depName,
                 version: packageJson.dependencies[depName],
               });
@@ -743,31 +512,16 @@ export class CMS {
           }
           await fs.save(
             ['dist', 'deps.json'],
-            JSON.stringify(deps, null, '  '),
+            JSON.stringify(
+              deps.map((e) => {
+                return { name: e.name, version: e.version };
+              }),
+              null,
+              '  ',
+            ),
           );
-          // delete packageJson.scripts;
-          // delete packageJson.devDependencies;
-          // await fs.save(
-          //   ['dist', 'custom-package.json'],
-          //   JSON.stringify(packageJson, null, '  '),
-          // );
         },
       },
-      // {
-      //   title: 'Copy src data',
-      //   async task() {
-      //     await fs.copy('src', ['dist', '_src']);
-      //   },
-      // },
-      // {
-      //   title: 'Zip output',
-      //   async task() {
-      //     await fs.save(
-      //       ['dist', 'bcms.zip'],
-      //       await Zip.create({ location: path.join(process.cwd(), 'dist') }),
-      //     );
-      //   },
-      // },
     ]);
     await tasks.run();
   }
@@ -777,35 +531,26 @@ export class CMS {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (!(await client.isLoggedIn())) {
       await login({ args, client });
     }
-    // if (!(await fs.exist(['dist', 'bcms.zip'], true))) {
-    //   await this.bundle();
-    // }
-    let instance: InstanceProtected;
-    let org: Org;
+    let instance: InstanceProtectedWithStatus;
     const instanceId: string = await getInstanceId();
     if (instanceId) {
       const instances = await client.instance.getAll();
       instance = instances.find(
         (e) => e._id === instanceId,
-      ) as InstanceProtected;
+      ) as InstanceProtectedWithStatus;
       if (!instance) {
         throw Error(
           `Instance with ID "${instanceId}" cannot be found on your account.`,
         );
       }
-      org = await client.org.get({ id: instance.org.id });
-      if (!org) {
-        throw Error(`Failed to find Organization with ID "${instance.org.id}"`);
-      }
     } else {
-      const answers = await Select.orgAndInstance({ client });
+      const answers = await Select.instance({ client });
       instance = answers.instance;
-      org = answers.org;
       const shimJson = JSON.parse(await fs.readString('shim.json'));
       shimJson.instanceId = instance._id;
       await fs.save('shim.json', JSON.stringify(shimJson));
@@ -815,231 +560,177 @@ export class CMS {
         name: 'yes',
         type: 'confirm',
         message: [
-          `Are you sure you want to upload new code to ${instance.name} in`,
-          `organization ${org.name}? This action is irreversible.`,
+          `Are you sure you want to upload new code to ${instance.name}?`,
+          `This action is irreversible.`,
         ].join(' '),
       },
     ]);
+
+    async function pushFje(
+      namespace: string,
+      logName: string,
+      fjeType: InstanceFJEType,
+    ) {
+      const fjes = (
+        await client.instanceFje.getAllByType({
+          instanceId: instance._id,
+          type: fjeType,
+        })
+      ).filter((e) => e.external);
+      if (await fs.exist(['dist', namespace])) {
+        const files = (await fs.readdir(['dist', namespace])).filter((e) =>
+          e.endsWith('.js'),
+        );
+        const fnNames: string[] = [];
+        for (let i = 0; i < files.length; i++) {
+          const fileName = files[i];
+          const file = await fs.readString(['dist', namespace, fileName]);
+          const itemName = fileName.replace('.js', '');
+          const existingFje = fjes.find((e) => e.name === itemName);
+          if (existingFje) {
+            process.stdout.write(`Updating ${logName}: ${itemName} ...`);
+            try {
+              await client.instanceFje.update({
+                _id: existingFje._id,
+                instanceId: instance._id,
+                name: itemName,
+                code: {
+                  raw: file,
+                },
+              });
+              process.stdout.write('DONE\n');
+            } catch (error) {
+              process.stdout.write('FAIL\n');
+              console.warn(error);
+            }
+          } else {
+            process.stdout.write(`Creating ${logName}: ${itemName} ...`);
+            try {
+              await client.instanceFje.create({
+                instanceId: instance._id,
+                type: fjeType,
+                name: itemName,
+                external: true,
+                code: {
+                  raw: file,
+                },
+              });
+              process.stdout.write('DONE\n');
+            } catch (error) {
+              process.stdout.write('FAIL\n');
+              console.warn(error);
+            }
+          }
+        }
+        for (let i = 0; i < fjes.length; i++) {
+          const fje = fjes[i];
+          if (!fnNames.includes(fje.name)) {
+            process.stdout.write(`Deleting ${logName}: ${fje.name} ... `);
+            try {
+              await client.instanceFje.deleteById({
+                instanceId: instance._id,
+                id: fje._id,
+              });
+              process.stdout.write('DONE\n');
+            } catch (error) {
+              process.stdout.write('FAIL\n');
+              console.log(error);
+            }
+          }
+        }
+      } else {
+        for (let i = 0; i < fjes.length; i++) {
+          const fje = fjes[i];
+          process.stdout.write(`Deleting ${logName}: ${fje.name} ... `);
+          try {
+            await client.instanceFje.deleteById({
+              instanceId: instance._id,
+              id: fje._id,
+            });
+            process.stdout.write('DONE\n');
+          } catch (error) {
+            process.stdout.write('FAIL\n');
+            console.log(error);
+          }
+        }
+      }
+    }
+
     if (confirm.yes) {
-      const updateData: InstanceUpdateData = {
-        id: instance._id,
-        orgId: instance.org.id,
-      };
       await createTasks([
         {
-          title: 'Initialize functions',
+          title: 'Deploy functions',
           task: async () => {
-            const namespace = 'functions';
-            if (await fs.exist(['dist', namespace])) {
-              const files = (await fs.readdir(['dist', namespace])).filter(
-                (e) => e.endsWith('.js'),
-              );
-              updateData[namespace] = [];
-              const fnNames: string[] = [];
-              for (let i = 0; i < files.length; i++) {
-                const fileName = files[i];
-                const file = await fs.readString(['dist', namespace, fileName]);
-                const data = await (
-                  await import(
-                    path.join(process.cwd(), 'dist', 'raw', namespace, fileName)
-                  )
-                ).default();
-                const itemName = data.config.name;
-                const itemExists = instance[namespace].find(
-                  (e) => e.name === itemName,
-                );
-                fnNames.push(itemName);
-                if (itemExists) {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (updateData[namespace] as any[]).push({
-                    update: {
-                      type: InstanceFJEType.FUNCTION,
-                      name: itemName,
-                      hash: itemExists.hash,
-                      external: true,
-                      code: Buffer.from(file).toString('base64'),
-                    },
-                  });
-                } else {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (updateData[namespace] as any).push({
-                    add: {
-                      type: InstanceFJEType.FUNCTION,
-                      name: itemName,
-                      hash: crypto.randomBytes(16).toString('hex'),
-                      external: true,
-                      code: Buffer.from(file).toString('base64'),
-                    },
-                  });
-                }
-              }
-              console.log(instance.functions);
-              for (let i = 0; i < instance.functions.length; i++) {
-                const fn = instance.functions[i];
-                if (fn.external) {
-                  if (!fnNames.includes(fn.name)) {
-                    updateData[namespace].push({
-                      remove: fn.hash,
-                    });
-                  }
-                }
-              }
-            } else {
-              updateData[namespace] = [];
-              for (let i = 0; i < instance.functions.length; i++) {
-                const item = instance.functions[i];
-                if (item.external) {
-                  updateData[namespace].push({
-                    remove: item.hash,
-                  });
-                }
-              }
-            }
+            pushFje('functions', 'function', 'F' as InstanceFJEType);
           },
         },
         {
-          title: 'Initialize events',
+          title: 'Deploy events',
           task: async () => {
-            const namespace = 'events';
-            updateData[namespace] = [];
-            if (await fs.exist(['dist', namespace])) {
-              const files = (await fs.readdir(['dist', namespace])).filter(
-                (e) => e.endsWith('.js'),
-              );
-              for (let i = 0; i < files.length; i++) {
-                const fileName = files[i];
-                const file = await fs.readString(['dist', namespace, fileName]);
-                const itemName = fileName;
-                const itemExists = instance[namespace].find(
-                  (e) => e.name === itemName,
-                );
-                if (itemExists) {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (updateData[namespace] as any[]).push({
-                    update: {
-                      type: InstanceFJEType.EVENT,
-                      name: itemName,
-                      hash: itemExists.hash,
-                      external: true,
-                      code: Buffer.from(file).toString('base64'),
-                    },
-                  });
-                } else {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (updateData[namespace] as any).push({
-                    add: {
-                      type: InstanceFJEType.EVENT,
-                      name: itemName,
-                      hash: crypto.randomBytes(16).toString('hex'),
-                      external: true,
-                      code: Buffer.from(file).toString('base64'),
-                    },
-                  });
-                }
-              }
-            } else {
-              for (let i = 0; i < instance.events.length; i++) {
-                const item = instance.events[i];
-                if (item.external) {
-                  updateData[namespace].push({
-                    remove: item.hash,
-                  });
-                }
-              }
-            }
+            pushFje('events', 'event', 'E' as InstanceFJEType);
+          },
+        },
+        {
+          title: 'Deploy jobs',
+          task: async () => {
+            pushFje('jobs', 'job', 'J' as InstanceFJEType);
           },
         },
         {
           title: 'Initialize additional assets',
           task: async () => {
             const namespace = 'additional';
-            updateData.additionalFiles = [];
+            const logName = 'additional file';
+            const afs = await client.instanceAdditionalFile.getAll({
+              instanceId: instance._id,
+            });
             if (await fs.exist(['dist', namespace])) {
-              const files = (await fs.fileTree(['dist', namespace], '')).filter(
-                (e) => e.path.rel.endsWith('.js'),
-              );
+              const files = await fs.fileTree(['dist', namespace], '');
               for (let i = 0; i < files.length; i++) {
                 const fileInfo = files[i];
-                const filePathParts = fileInfo.path.rel.split('/');
-                const fileName = filePathParts[filePathParts.length - 1];
-                updateData.additionalFiles.push({
-                  set: {
-                    name: fileName,
+                const file = await fs.readString(fileInfo.path.abs);
+                try {
+                  await client.instanceAdditionalFile.create({
+                    instanceId: instance._id,
                     path: fileInfo.path.rel,
-                    data: Buffer.from(
-                      await fs.readString(fileInfo.path.abs),
-                    ).toString('base64'),
-                  },
-                });
+                    code: file,
+                  });
+                  process.stdout.write('DONE\n');
+                } catch (error) {
+                  process.stdout.write('FAIL\n');
+                  console.log(error);
+                }
               }
-              if (instance.additionalFiles) {
-                for (let i = 0; i < instance.additionalFiles.length; i++) {
-                  const af = instance.additionalFiles[i];
-                  const fileInfo = files.find((e) => e.path.rel === af.path);
-                  if (!fileInfo) {
-                    updateData.additionalFiles.push({
-                      remove: af.path,
+              for (let i = 0; i < afs.length; i++) {
+                const af = afs[i];
+                const fileInfo = files.find((e) => e.path.rel === af.path);
+                if (!fileInfo) {
+                  process.stdout.write(`Deleting ${logName}: ${af.path} ... `);
+                  try {
+                    await client.instanceAdditionalFile.deleteById({
+                      instanceId: instance._id,
+                      id: af._id,
                     });
+                    process.stdout.write('DONE\n');
+                  } catch (error) {
+                    process.stdout.write('FAIL\n');
+                    console.log(error);
                   }
                 }
               }
-            } else if (instance.additionalFiles) {
-              for (let i = 0; i < instance.additionalFiles.length; i++) {
-                const item = instance.additionalFiles[i];
-                updateData.additionalFiles.push({
-                  remove: item.path,
-                });
-              }
-            }
-          },
-        },
-        {
-          title: 'Initialize jobs',
-          task: async () => {
-            const namespace = 'jobs';
-            updateData[namespace] = [];
-            if (await fs.exist(['dist', namespace])) {
-              const files = (await fs.readdir(['dist', namespace])).filter(
-                (e) => e.endsWith('.js'),
-              );
-              for (let i = 0; i < files.length; i++) {
-                const fileName = files[i];
-                const file = await fs.readString(['dist', namespace, fileName]);
-                const itemName = fileName;
-                const itemExists = instance[namespace].find(
-                  (e) => e.name === itemName,
-                );
-                if (itemExists) {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (updateData[namespace] as any[]).push({
-                    update: {
-                      type: InstanceFJEType.JOB,
-                      name: itemName,
-                      hash: itemExists.hash,
-                      external: true,
-                      code: Buffer.from(file).toString('base64'),
-                    },
-                  });
-                } else {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (updateData[namespace] as any).push({
-                    add: {
-                      type: InstanceFJEType.JOB,
-                      name: itemName,
-                      hash: crypto.randomBytes(16).toString('hex'),
-                      external: true,
-                      code: Buffer.from(file).toString('base64'),
-                    },
-                  });
-                }
-              }
             } else {
-              for (let i = 0; i < instance.jobs.length; i++) {
-                const item = instance.jobs[i];
-                if (item.external) {
-                  updateData[namespace].push({
-                    remove: item.hash,
+              for (let i = 0; i < afs.length; i++) {
+                const af = afs[i];
+                process.stdout.write(`Deleting ${logName}: ${af.path} ... `);
+                try {
+                  await client.instanceAdditionalFile.deleteById({
+                    instanceId: instance._id,
+                    id: af._id,
                   });
+                  process.stdout.write('DONE\n');
+                } catch (error) {
+                  process.stdout.write('FAIL\n');
+                  console.log(error);
                 }
               }
             }
@@ -1052,147 +743,40 @@ export class CMS {
               const deps: InstanceDep[] = JSON.parse(
                 await fs.readString(['dist', 'deps.json']),
               );
-              updateData.deps = deps.map((dep) => {
-                return {
-                  add: dep,
-                };
+              const existingDeps = await client.instanceDep.getAll({
+                instanceId: instance._id,
               });
+              for (let i = 0; i < deps.length; i++) {
+                const dep = deps[i];
+                const existingDep = existingDeps.find(
+                  (e) => e.name === dep.name,
+                );
+                try {
+                  if (existingDep) {
+                    process.stdout.write(`Updating dependency: ${dep.name}`);
+                    await client.instanceDep.update({
+                      _id: existingDep._id,
+                      instanceId: existingDep.instanceId,
+                      name: dep.name,
+                      version: dep.name,
+                    });
+                  } else {
+                    process.stdout.write(`Creating dependency: ${dep.name}`);
+                    await client.instanceDep.create({
+                      instanceId: instance._id,
+                      name: dep.name,
+                      version: dep.name,
+                    });
+                  }
+                } catch (error) {
+                  process.stdout.write('FAIL\n');
+                  console.error(error);
+                }
+              }
             }
-          },
-        },
-        {
-          title: 'Deploy changes',
-          task: async () => {
-            await client.instance.update(updateData);
           },
         },
       ]).run();
-    }
-  }
-
-  static async clone({
-    args,
-    client,
-  }: {
-    args: Args;
-    client: ApiClient;
-  }): Promise<void> {
-    if (!(await client.isLoggedIn())) {
-      await login({ args, client });
-    }
-    const { org, instance } = await Select.orgAndInstance({ client });
-    const repoName = `${org.nameEncoded}-${instance.nameEncoded}`;
-    const repoPath = path.join(process.cwd(), repoName);
-    const repoFS = createFS({
-      base: path.join(process.cwd(), repoName),
-    });
-
-    const tasks = createTasks([
-      {
-        title: 'Clone base GitHub repository',
-        task: async () => {
-          await ChildProcess.spawn('git', [
-            'clone',
-            'https://github.com/bcms/cms',
-            repoName,
-          ]);
-          // TODO: Remove this line when ready for production
-          await ChildProcess.spawn('git', ['checkout', 'next'], {
-            stdio: 'inherit',
-            cwd: repoPath,
-          });
-          await repoFS.mkdir('uploads');
-          await repoFS.save(['db', 'bcms.fsdb.json'], '{}');
-        },
-      },
-      {
-        title: 'Install dependencies',
-        task: async () => {
-          await ChildProcess.spawn('npm', ['i'], {
-            stdio: 'inherit',
-            cwd: repoPath,
-          });
-        },
-      },
-      {
-        title: 'Get instance data',
-        task: async () => {
-          console.log('zip', instance.zip);
-          if (instance.zip) {
-            const buffer = await client.media.get.instanceZip({
-              orgId: org._id,
-              instanceId: instance._id,
-              onProgress(value) {
-                console.log(`Downloading bcms.zip: ${value}%`);
-              },
-            });
-            const tmpName = '__ziptmp';
-            const tmpPath = path.join(repoPath, tmpName);
-            await fs.mkdir(tmpPath);
-            Zip.unzip({ location: tmpPath, buffer });
-            await fs.deleteDir(path.join(repoPath, 'src'));
-            await fs.copy(
-              path.join(repoPath, tmpName, '_src'),
-              path.join(repoPath, 'src'),
-            );
-            const customPackageJson = JSON.parse(
-              await fs.readString(
-                path.join(repoPath, tmpName, 'custom-package.json'),
-              ),
-            );
-            const packageJson = JSON.parse(
-              await fs.readString(path.join(repoPath, 'package.json')),
-            );
-            for (const depName in customPackageJson.dependencies) {
-              packageJson.dependencies[depName] =
-                customPackageJson.dependencies[depName];
-            }
-            await fs.save(
-              path.join(repoPath, 'package.json'),
-              JSON.stringify(packageJson, null, '  '),
-            );
-            await fs.deleteDir(path.join(repoPath, tmpName));
-          }
-          await fs.save(
-            path.join(repoPath, 'shim.json'),
-            JSON.stringify(
-              {
-                code: 'local',
-                local: true,
-                instanceId: instance._id,
-                orgId: instance.org.id,
-              },
-              null,
-              '  ',
-            ),
-          );
-        },
-      },
-      ...CMS.pullTasks(instance, repoFS, client),
-    ]);
-    await tasks.run();
-  }
-
-  static async pull({
-    args,
-    client,
-  }: {
-    args: Args;
-    client: ApiClient;
-  }): Promise<void> {
-    if (!(await client.isLoggedIn())) {
-      await login({ args, client });
-    }
-    const repoFS = createFS({
-      base: process.cwd(),
-    });
-    const shimJson = JSON.parse(await repoFS.readString('shim.json'));
-    const instance = await client.instance.get({
-      orgId: shimJson.orgId,
-      instanceId: shimJson.instanceId,
-    });
-    if (instance) {
-      await createTasks(CMS.pullTasks(instance, repoFS, client)).run();
     }
   }
 
@@ -1201,7 +785,7 @@ export class CMS {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     Terminal.pushComponent({
       name: 'title',
@@ -1223,17 +807,14 @@ export class CMS {
     }
     const result = await Select.cloudOrLocal({ client });
     const apiOrigin = result.cloud
-      ? `https://${
-          result.cloud.instance.domains[1]
-            ? result.cloud.instance.domains[1].name
-            : result.cloud.instance.domains[0].name
-        }`
+      ? await Select.instanceDomain({ client, instance: result.cloud.instance })
       : 'http://localhost:8080';
     const sdk = createSdk3({
       origin: apiOrigin,
     });
     const otp = await client.user.getOtp();
-    await sdk.shim.verify.otp(otp);
+    const user = await client.user.get();
+    await sdk.shim.verify.otp(`${user._id}_${otp}`);
     console.log(
       'Creating data bundle.',
       'Please wait, this might take a few minutes.',
@@ -1263,8 +844,7 @@ export class CMS {
       }, 2000);
       const unsub = sdk.socket.subscribe(
         BCMSSocketEventName.BACKUP,
-        async (event) => {
-          console.log(event);
+        async () => {
           clearTimeout(timeout);
           clearInterval(interval);
           unsub();

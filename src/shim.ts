@@ -1,6 +1,5 @@
 import { Docker } from '@banez/docker';
 import type { DockerContainerInfo } from '@banez/docker/types';
-import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import { DockerUtil } from './util';
 import { createTasks } from '@banez/npm-tool';
 import { ChildProcess } from '@banez/child_process';
@@ -8,6 +7,7 @@ import type { ChildProcessOnChunkHelperOutput } from '@banez/child_process/types
 import { Config } from './config';
 import type { Args } from './types';
 import { StringUtility } from '@banez/string-utility';
+import type { BCMSCloudSdk } from '@becomes/cms-cloud-client';
 
 export class Shim {
   static readonly containerName = 'bcms-shim';
@@ -17,7 +17,7 @@ export class Shim {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (args.shim === 'install') {
       await this.install({ args, client });
@@ -30,13 +30,13 @@ export class Shim {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     let dockerImageVersion = 'latest';
     if (args.instanceId) {
-      dockerImageVersion = await client.shim.version(
-        args.instanceId || '____none',
-      );
+      dockerImageVersion = await client.shim.version({
+        instanceId: args.instanceId || '____none',
+      });
     }
 
     if (!(await DockerUtil.setup({ args }))) {
@@ -241,12 +241,12 @@ export class Shim {
     args,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     console.log('Check shim updates ...');
-    const newShimVersion = await client.shim.version(
-      args.instanceId || '____none',
-    );
+    const newShimVersion = await client.shim.version({
+      instanceId: args.instanceId || '____none',
+    });
     const containersInfo = await Docker.container.list();
     const shimContainer = containersInfo.find((e) => e.names === 'bcms-shim');
     if (!shimContainer) {
