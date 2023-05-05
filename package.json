@@ -30,7 +30,7 @@
     "@banez/string-utility": "^1.0.1",
     "@banez/vue-array-store": "^1.2.0",
     "@becomes/cms-client": "^3.3.5",
-    "@becomes/cms-cloud-client": "file:cloud-sdk.tgz",
+    "@becomes/cms-cloud-client": "^2.0.0",
     "@becomes/cms-most": "^2.6.9",
     "@becomes/cms-sdk": "^3.4.1",
     "@becomes/purple-cheetah": "^3.7.4",
@@ -46,7 +46,7 @@
     "jsdom": "^20.0.0",
     "open": "^8.4.0",
     "sharp": "^0.30.6",
-    "socket.io-client": "^4.4.0",
+    "socket.io-client": "^4.3.2",
     "uuid": "^8.3.2"
   },
   "devDependencies": {
