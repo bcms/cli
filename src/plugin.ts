@@ -283,7 +283,7 @@ export class Plugin {
     const packageJson = JSON.parse(
       await fs.readString(['dist', pluginNameEncoded, 'package.json']),
     );
-    const tag = Buffer.from(packageJson.name).toString('hex');
+    const tag = packageJson.name;
     const version = packageJson.version;
     const tgz = await fs.read(['dist', fileName]);
     const formData = new FormData();

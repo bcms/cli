@@ -149,11 +149,11 @@ export class Select {
       ]);
       if (selectedDomain.domain === 'localhost') {
         origin = `http://localhost:8080`;
-      } else if (selectedDomain.domain !== instance.domain) {
+      } else {
         const protocol = await prompt<{ value: string }>([
           {
             message: 'Which protocol should be used?',
-            name: 'protocol',
+            name: 'value',
             type: 'list',
             choices: [
               {

@@ -92,7 +92,7 @@ export class Shim {
             {
               onChunk: ChildProcess.onChunkHelper(exo),
               doNotThrowError: true,
-            },
+            }
           ).awaiter;
           if (exo.err) {
             if (!exo.err.includes('network with name bcms already exists')) {
@@ -101,7 +101,7 @@ export class Shim {
                   '[e1] Cannot create "bcms" docker network.',
                   'You will need to create it manually. ---',
                   exo.err,
-                ].join(' '),
+                ].join(' ')
               );
             }
           } else if (!exo.out) {
@@ -109,7 +109,7 @@ export class Shim {
               [
                 '[e2] Cannot create "bcms" docker network.',
                 'You will need to create it manually.',
-              ].join(' '),
+              ].join(' ')
             );
           }
         },
@@ -189,7 +189,7 @@ export class Shim {
               onChunk(type, chunk) {
                 process[type].write(chunk);
               },
-            },
+            }
           ).awaiter;
         },
       },
@@ -211,7 +211,7 @@ export class Shim {
           const shimPart = StringUtility.textBetween(
             fileContent,
             '# ---- SHIM START ----\n',
-            '\n# ---- SHIM END ----',
+            '\n# ---- SHIM END ----'
           );
           if (shimPart) {
             fileContent = fileContent.replace(
@@ -220,7 +220,7 @@ export class Shim {
                 '@reboot sudo docker start bcms-shim',
                 '* * * * * sudo docker start bcms-shim',
                 '* * * * * sudo bcms --shim update',
-              ].join('\n'),
+              ].join('\n')
             );
           } else {
             fileContent += [
@@ -256,7 +256,7 @@ export class Shim {
       'Curr:',
       shimContainer.image,
       'New:',
-      `becomes/cms-shim:${newShimVersion}`,
+      `becomes/cms-shim:${newShimVersion}`
     );
     if (shimContainer.image !== `becomes/cms-shim:${newShimVersion}`) {
       console.log('Updating Shim');
@@ -310,7 +310,7 @@ export class Shim {
           onChunk(type, chunk) {
             process[type].write(chunk);
           },
-        },
+        }
       ).awaiter;
     }
   }
