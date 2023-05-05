@@ -2,7 +2,7 @@ import { prompt } from 'inquirer';
 import type { Args } from './types';
 import { FunctionTemplates } from './templates';
 import { createFS } from '@banez/fs';
-import type { ApiClient } from '@becomes/cms-cloud-client/types';
+import type { BCMSCloudSdk } from '@becomes/cms-cloud-client';
 
 const fs = createFS({
   base: process.cwd(),
@@ -13,7 +13,7 @@ export class Function {
     args,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (args.function === 'create') {
       await this.create(args);

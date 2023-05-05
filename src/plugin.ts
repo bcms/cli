@@ -6,7 +6,6 @@ import { createTasks } from './util';
 import { ChildProcess } from '@banez/child_process';
 import { createFS } from '@banez/fs';
 import type { Args } from './types';
-import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import { login } from './login';
 import {
   createTerminalProgressBar,
@@ -14,6 +13,7 @@ import {
   Terminal,
 } from './terminal';
 import { StringUtility } from '@becomes/purple-cheetah';
+import type { BCMSCloudSdk } from '@becomes/cms-cloud-client';
 
 const fs = createFS({
   base: process.cwd(),
@@ -25,7 +25,7 @@ export class Plugin {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (args.plugin === 'bundle') {
       await this.bundle();
@@ -230,7 +230,7 @@ export class Plugin {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (!(await fs.exist('dist'))) {
       await Plugin.bundle();
@@ -248,7 +248,7 @@ export class Plugin {
     }
     const user = await client.user.get();
     const instances = (await client.instance.getAll()).filter((e) =>
-      e.user.list.find((u) => u.id === user._id && u.role === 'ADMIN'),
+      e.users.find((u) => u.id === user._id && u.role === 'ADMIN'),
     );
     if (instances.length === 0) {
       console.log('You do not have ADMIN access to any instance.');
@@ -283,11 +283,11 @@ export class Plugin {
     const packageJson = JSON.parse(
       await fs.readString(['dist', pluginNameEncoded, 'package.json']),
     );
-    const tag = Buffer.from(packageJson.name).toString('hex');
+    const tag = packageJson.name;
     const version = packageJson.version;
     const tgz = await fs.read(['dist', fileName]);
     const formData = new FormData();
-    formData.append('media', tgz, {
+    formData.append('plugin', tgz, {
       filename: fileName,
       contentType: 'application/x-compressed-tar',
     });
@@ -301,15 +301,14 @@ export class Plugin {
       name: 'progress',
       component: progressBar,
     });
-    await client.media.set.instancePlugin({
+    await client.instancePlugin.set({
       instanceId: inst._id,
-      orgId: inst.org.id,
       name: pluginInfo.pluginName,
       tag,
       version,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       formData: formData as any,
-      onProgress(value) {
+      onUploadProgress(value) {
         progressBar.update({
           state: {
             name: 'Upload plugin to the cloud',
@@ -321,7 +320,10 @@ export class Plugin {
     });
   }
 
-  static async create(_data: { args: Args; client: ApiClient }): Promise<void> {
+  static async create(_data: {
+    args: Args;
+    client: BCMSCloudSdk;
+  }): Promise<void> {
     const answers = await prompt<{ projectName: string }>([
       {
         name: 'projectName',

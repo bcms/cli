@@ -1,5 +1,4 @@
 import * as path from 'path';
-import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import type { Args } from './types';
 import { prompt } from 'inquirer';
 import { createTasks } from '@banez/npm-tool';
@@ -7,6 +6,7 @@ import { ChildProcess } from '@banez/child_process';
 import { createSdk3, Select } from './util';
 import type { BCMSApiKey } from '@becomes/cms-sdk/types';
 import { createFS } from '@banez/fs';
+import type { BCMSCloudSdk } from '@becomes/cms-cloud-client';
 
 export class Website {
   static async resolve({
@@ -14,7 +14,7 @@ export class Website {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (args.website === 'create') {
       await Website.create({ args, client });
@@ -25,7 +25,7 @@ export class Website {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     const answers = await prompt<{
       projectName: string;
@@ -86,11 +86,10 @@ export class Website {
           if (connect.yes) {
             const result = await Select.cloudOrLocal({ client });
             const apiOrigin = result.cloud
-              ? `https://${
-                  result.cloud.instance.domains[1]
-                    ? result.cloud.instance.domains[1].name
-                    : result.cloud.instance.domains[0].name
-                }`
+              ? await Select.instanceDomain({
+                  instance: result.cloud.instance,
+                  client,
+                })
               : 'http://localhost:8080';
             const sdk = createSdk3({
               origin: apiOrigin,

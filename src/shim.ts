@@ -1,6 +1,5 @@
 import { Docker } from '@banez/docker';
 import type { DockerContainerInfo } from '@banez/docker/types';
-import type { ApiClient } from '@becomes/cms-cloud-client/types';
 import { DockerUtil } from './util';
 import { createTasks } from '@banez/npm-tool';
 import { ChildProcess } from '@banez/child_process';
@@ -8,6 +7,7 @@ import type { ChildProcessOnChunkHelperOutput } from '@banez/child_process/types
 import { Config } from './config';
 import type { Args } from './types';
 import { StringUtility } from '@banez/string-utility';
+import type { BCMSCloudSdk } from '@becomes/cms-cloud-client';
 
 export class Shim {
   static readonly containerName = 'bcms-shim';
@@ -17,7 +17,7 @@ export class Shim {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (args.shim === 'install') {
       await this.install({ args, client });
@@ -30,13 +30,13 @@ export class Shim {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     let dockerImageVersion = 'latest';
     if (args.instanceId) {
-      dockerImageVersion = await client.shim.version(
-        args.instanceId || '____none',
-      );
+      dockerImageVersion = await client.shim.version({
+        instanceId: args.instanceId || '____none',
+      });
     }
 
     if (!(await DockerUtil.setup({ args }))) {
@@ -92,7 +92,7 @@ export class Shim {
             {
               onChunk: ChildProcess.onChunkHelper(exo),
               doNotThrowError: true,
-            },
+            }
           ).awaiter;
           if (exo.err) {
             if (!exo.err.includes('network with name bcms already exists')) {
@@ -101,7 +101,7 @@ export class Shim {
                   '[e1] Cannot create "bcms" docker network.',
                   'You will need to create it manually. ---',
                   exo.err,
-                ].join(' '),
+                ].join(' ')
               );
             }
           } else if (!exo.out) {
@@ -109,7 +109,7 @@ export class Shim {
               [
                 '[e2] Cannot create "bcms" docker network.',
                 'You will need to create it manually.',
-              ].join(' '),
+              ].join(' ')
             );
           }
         },
@@ -189,7 +189,7 @@ export class Shim {
               onChunk(type, chunk) {
                 process[type].write(chunk);
               },
-            },
+            }
           ).awaiter;
         },
       },
@@ -211,7 +211,7 @@ export class Shim {
           const shimPart = StringUtility.textBetween(
             fileContent,
             '# ---- SHIM START ----\n',
-            '\n# ---- SHIM END ----',
+            '\n# ---- SHIM END ----'
           );
           if (shimPart) {
             fileContent = fileContent.replace(
@@ -220,7 +220,7 @@ export class Shim {
                 '@reboot sudo docker start bcms-shim',
                 '* * * * * sudo docker start bcms-shim',
                 '* * * * * sudo bcms --shim update',
-              ].join('\n'),
+              ].join('\n')
             );
           } else {
             fileContent += [
@@ -241,12 +241,12 @@ export class Shim {
     args,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     console.log('Check shim updates ...');
-    const newShimVersion = await client.shim.version(
-      args.instanceId || '____none',
-    );
+    const newShimVersion = await client.shim.version({
+      instanceId: args.instanceId || '____none',
+    });
     const containersInfo = await Docker.container.list();
     const shimContainer = containersInfo.find((e) => e.names === 'bcms-shim');
     if (!shimContainer) {
@@ -256,7 +256,7 @@ export class Shim {
       'Curr:',
       shimContainer.image,
       'New:',
-      `becomes/cms-shim:${newShimVersion}`,
+      `becomes/cms-shim:${newShimVersion}`
     );
     if (shimContainer.image !== `becomes/cms-shim:${newShimVersion}`) {
       console.log('Updating Shim');
@@ -310,7 +310,7 @@ export class Shim {
           onChunk(type, chunk) {
             process[type].write(chunk);
           },
-        },
+        }
       ).awaiter;
     }
   }

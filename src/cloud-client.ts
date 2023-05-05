@@ -1,208 +1,240 @@
-import type { ApiClient, Storage } from '@becomes/cms-cloud-client/types';
-import {
-  createApiClient,
-  createCache,
-  useApiClient,
-} from '@becomes/cms-cloud-client';
+import * as crypto from 'crypto';
+import * as path from 'path';
 import { useThrowable } from './util';
 import type { Args } from './types';
+import { BCMSCloudSdk } from '@becomes/cms-cloud-client/sdk/main';
+import type {
+  Storage,
+  StorageSubscriptionHandler,
+} from '@banez/browser-storage/types';
+import type { ArrayStore, StoreMethods } from '@banez/vue-array-store/types';
+import type { UserProtected } from '@becomes/cms-cloud-client';
+import { createFS } from '@banez/fs';
+import { Config } from './config';
 
-interface DefaultSetters<Item> {
-  set(srcItems: Item[], items: Item | Item[]): void;
-  remove(srcItems: Item[], items: Item | Item[]): void;
-}
-function defaultSetters<Item>(getId: (item: Item) => string): {
-  set(srcItems: Item[], items: Item | Item[]): void;
-  remove(srcItems: Item[], items: Item | Item[]): void;
-} {
-  return {
-    set(srcItems, items): void {
-      if (items instanceof Array) {
-        for (let i = 0; i < items.length; i++) {
-          let found = false;
-          const itemId = getId(items[i]);
-          for (let j = 0; j < srcItems.length; j++) {
-            const srcItemId = getId(srcItems[j]);
-            if (srcItemId === itemId) {
-              found = true;
-              srcItems[j] = items[i];
-              break;
-            }
-          }
-          if (!found) {
-            srcItems.push(items[i]);
-          }
-        }
-      } else {
-        let found = false;
-        const itemId = getId(items);
-        for (let i = 0; i < srcItems.length; i++) {
-          const srcItemId = getId(srcItems[i]);
-          if (srcItemId === itemId) {
-            found = true;
-            srcItems[i] = items;
-            break;
-          }
-        }
-        if (!found) {
-          srcItems.push(items);
+function createArrayStore<ItemType, Methods = unknown>(
+  idKey: keyof ItemType,
+  initItems?: ItemType[],
+  methods?: StoreMethods<ItemType, Methods>,
+): ArrayStore<ItemType, Methods> {
+  const store = initItems || [];
+  const self: ArrayStore<ItemType, Methods> = {
+    items() {
+      return store as ItemType[];
+    },
+    find(query) {
+      for (let i = 0; i < store.length; i++) {
+        const item = store[i];
+        if (query(item as ItemType)) {
+          return item as ItemType;
         }
       }
+      return null;
     },
-    remove(srcItems, items): void {
-      if (items instanceof Array) {
-        const removeIds = items.map((e) => getId(e));
-        while (removeIds.length > 0) {
-          const id = removeIds.pop();
-          for (let i = 0; i < srcItems.length; i++) {
-            const srcItemId = getId(srcItems[i]);
-            if (srcItemId === id) {
-              srcItems.splice(i, 1);
-              break;
-            }
-          }
-        }
-      } else {
-        const itemId = getId(items);
-        for (let i = 0; i < srcItems.length; i++) {
-          const srcItemId = getId(srcItems[i]);
-          if (srcItemId === itemId) {
-            srcItems.splice(i, 1);
-            break;
-          }
-        }
-      }
+    findById(id) {
+      const output = store.find((e) => e[idKey as never] === id);
+      return (output as ItemType) || null;
     },
-  };
-}
-
-interface DefaultGetters<Item> {
-  find(items: Item[], query: (item: Item) => boolean): Item[];
-  findOne(items: Item[], query: (item: Item) => boolean): Item | undefined;
-}
-function defaultGetters<Item>(): {
-  find(items: Item[], query: (item: Item) => boolean): Item[];
-  findOne(items: Item[], query: (item: Item) => boolean): Item | undefined;
-} {
-  return {
-    find(items, query) {
-      const output: Item[] = [];
-      for (let i = 0; i < items.length; i++) {
-        if (query(items[i])) {
-          output.push(items[i]);
+    findMany(query) {
+      const output: ItemType[] = [];
+      for (let i = 0; i < store.length; i++) {
+        const item = store[i];
+        if (query(item as ItemType)) {
+          output.push(store[i] as ItemType);
         }
       }
       return output;
     },
-    findOne(items, query) {
+    findManyById(ids) {
+      return store.filter((e) => ids.includes(e[idKey as never])) as ItemType[];
+    },
+    set(inputItems) {
+      const items = inputItems instanceof Array ? inputItems : [inputItems];
       for (let i = 0; i < items.length; i++) {
-        if (query(items[i])) {
-          return items[i];
+        const inputItem = items[i];
+        let found = false;
+        for (let j = 0; j < store.length; j++) {
+          const storeItem = store[j];
+          if (storeItem[idKey] === inputItem[idKey]) {
+            found = true;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            store.splice(j, 1, inputItem as any);
+            break;
+          }
+        }
+        if (!found) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          store.push(inputItem as any);
         }
       }
     },
+    remove(inputIds) {
+      const ids = inputIds instanceof Array ? inputIds : [inputIds];
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        for (let j = 0; j < store.length; j++) {
+          const item = store[j];
+          if (item[idKey as never] === id) {
+            store.splice(j, 1);
+          }
+        }
+      }
+    },
+    methods: {} as never,
   };
+  if (methods) {
+    self.methods = methods(self);
+  }
+  return self;
 }
 
-export function createCloudApiClient({
+export async function createStorage(): Promise<Storage> {
+  const fs = createFS({
+    base: path.join(Config.fsDir, 'cli-db.json'),
+  });
+  let _storage: {
+    [key: string]: string;
+  } = {};
+  if (await fs.exist('', true)) {
+    _storage = JSON.parse(await fs.readString(''));
+  }
+
+  const ls = {
+    async all() {
+      return JSON.parse(JSON.stringify(_storage));
+    },
+    getItem(key: string) {
+      return _storage[key];
+    },
+    async setItem(key: string, value: string) {
+      _storage[key] = value;
+      await fs.save('', JSON.stringify(_storage, null, '  '));
+    },
+    async removeItem(key: string) {
+      delete _storage[key];
+      await fs.save('', JSON.stringify(_storage, null, '  '));
+    },
+  };
+  const subs: {
+    [id: string]: {
+      key: string;
+      handler: StorageSubscriptionHandler<unknown>;
+    };
+  } = {};
+
+  const self: Storage = {
+    async clear() {
+      _storage = {};
+      await fs.save('', '{}');
+    },
+    async set(key, value) {
+      const keyBase = `${key}`;
+      try {
+        let data = '';
+        if (typeof value === 'object') {
+          data = JSON.stringify(value);
+        } else if (typeof value === 'string') {
+          data = value as string;
+        } else {
+          // eslint-disable-next-line no-console
+          console.error(
+            `Value can be only "string" or "object" but "${typeof value}" was provided.`,
+          );
+          return false;
+        }
+        await ls.setItem(keyBase, data);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error(e);
+        return false;
+      }
+      const ids = Object.keys(subs);
+      for (let i = 0; i < ids.length; i++) {
+        const sub = subs[ids[i]];
+        if (sub.key === key) {
+          await sub.handler(value, 'set');
+        }
+      }
+      return true;
+    },
+    async remove(key) {
+      await ls.removeItem(key);
+      const ids = Object.keys(subs);
+      for (let i = 0; i < ids.length; i++) {
+        const sub = subs[ids[i]];
+        if (sub.key === key) {
+          await sub.handler(null, 'remove');
+        }
+      }
+    },
+    get(key) {
+      const rawValue = ls.getItem(key);
+      if (rawValue) {
+        try {
+          const data = JSON.parse(rawValue);
+          return data;
+        } catch (e) {
+          return rawValue;
+        }
+      }
+      return undefined;
+    },
+    subscribe(key, handler) {
+      const id = crypto
+        .createHash('sha1')
+        .update(Date.now() + crypto.randomBytes(8).toString('hex'))
+        .digest('hex');
+      subs[id] = { key, handler: handler as never };
+      return () => {
+        delete subs[id];
+      };
+    },
+  };
+  return self;
+}
+
+export async function createCloudApiClient({
   args,
-  storage,
 }: {
   args: Args;
-  storage: Storage;
-}): ApiClient {
-  createApiClient({
-    disableSocket: true,
-    apiOrigin: args.cloudOrigin
-      ? args.cloudOrigin
-      : 'https://cloud.thebcms.com',
-    throwable: useThrowable(),
-    storage,
-    router: {
+}): Promise<BCMSCloudSdk> {
+  const client: BCMSCloudSdk = new BCMSCloudSdk(
+    args.cloudOrigin ? args.cloudOrigin : 'https://cloud.thebcms.com',
+    await createStorage(),
+    {
+      user: createArrayStore<UserProtected, { me(): UserProtected | null }>(
+        '_id',
+        [],
+        (userStore) => {
+          return {
+            me() {
+              if (client.accessToken) {
+                return userStore.findById(client.accessToken.payload.userId);
+              }
+              return null;
+            },
+          };
+        },
+      ),
+      feature: createArrayStore('_id'),
+      instance: createArrayStore('_id'),
+      instanceDep: createArrayStore('_id'),
+      instanceDomain: createArrayStore('_id'),
+      instanceEnv: createArrayStore('_id'),
+      instanceFje: createArrayStore('_id'),
+      instancePlugin: createArrayStore('_id'),
+      instanceProxyConfig: createArrayStore('_id'),
+      instanceAdditionalFile: createArrayStore('_id'),
+      invitation: createArrayStore('_id'),
+      limit: createArrayStore('_id'),
+      org: createArrayStore('_id'),
+    },
+    useThrowable(),
+    {
       async push() {
-        // Do nothing...
+        // Do nothing
       },
     },
-    cache: createCache(() => {
-      const cache: {
-        [name: string]: {
-          items: any[];
-          setters: DefaultSetters<any>;
-          getters: DefaultGetters<any>;
-        };
-      } = {
-        user: {
-          items: [],
-          getters: defaultGetters(),
-          setters: defaultSetters((item) => {
-            return item._id;
-          }),
-        },
-        org: {
-          items: [],
-          getters: defaultGetters(),
-          setters: defaultSetters((item) => {
-            return item._id;
-          }),
-        },
-        instance: {
-          items: [],
-          getters: defaultGetters(),
-          setters: defaultSetters((item) => {
-            return item._id;
-          }),
-        },
-        instanceLite: {
-          items: [],
-          getters: defaultGetters(),
-          setters: defaultSetters((item) => {
-            return item._id;
-          }),
-        },
-        invitation: {
-          items: [],
-          getters: defaultGetters(),
-          setters: defaultSetters((item) => {
-            return item._id;
-          }),
-        },
-      };
-      return {
-        find(name, query) {
-          return JSON.parse(
-            JSON.stringify(
-              cache[name].getters.find(cache[name].items, query as never),
-            ),
-          );
-        },
-        findOne(name, query) {
-          const result = cache[name].getters.findOne(
-            cache[name].items,
-            query as never,
-          );
-          return result ? JSON.parse(JSON.stringify(result)) : null;
-        },
-        items(name) {
-          return JSON.parse(JSON.stringify(cache[name].items));
-        },
-        me() {
-          const jwt = client.getAccessToken();
-          if (jwt) {
-            return cache.user.getters.findOne(
-              cache.user.items,
-              (e) => e._id === jwt.payload.userId,
-            );
-          }
-        },
-        set(name, items) {
-          cache[name].setters.set(cache[name].items, items);
-        },
-        remove(name, items) {
-          cache[name].setters.remove(cache[name].items, items);
-        },
-      };
-    }),
-  });
-  const client = useApiClient();
+  );
   return client;
 }

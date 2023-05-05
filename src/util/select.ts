@@ -1,15 +1,15 @@
 import type {
-  ApiClient,
-  InstanceProtected,
+  BCMSCloudSdk,
+  InstanceProtectedWithStatus,
   Org,
-} from '@becomes/cms-cloud-client/types';
+} from '@becomes/cms-cloud-client';
 import { prompt } from 'inquirer';
 
 export class Select {
-  static async cloudOrLocal({ client }: { client: ApiClient }): Promise<{
+  static async cloudOrLocal({ client }: { client: BCMSCloudSdk }): Promise<{
     local?: boolean;
     cloud?: {
-      instance: InstanceProtected;
+      instance: InstanceProtectedWithStatus;
     };
   }> {
     const result = await prompt<{ type: 'cloud' | 'local' }>([
@@ -39,9 +39,9 @@ export class Select {
     };
   }
 
-  static async orgAndInstance({ client }: { client: ApiClient }): Promise<{
+  static async orgAndInstance({ client }: { client: BCMSCloudSdk }): Promise<{
     org: Org;
-    instance: InstanceProtected;
+    instance: InstanceProtectedWithStatus;
   }> {
     const orgs = await client.org.getAll();
     const instances = await client.instance.getAll();
@@ -86,8 +86,8 @@ export class Select {
     return { org, instance };
   }
 
-  static async instance({ client }: { client: ApiClient }): Promise<{
-    instance: InstanceProtected;
+  static async instance({ client }: { client: BCMSCloudSdk }): Promise<{
+    instance: InstanceProtectedWithStatus;
   }> {
     const instances = await client.instance.getAll();
     const instResult = await prompt<{ instanceId: string }>([
@@ -110,5 +110,66 @@ export class Select {
       );
     }
     return { instance };
+  }
+
+  static async instanceDomain({
+    instance,
+    client,
+  }: {
+    instance: InstanceProtectedWithStatus;
+    client: BCMSCloudSdk;
+  }): Promise<string> {
+    const domains = await client.instanceDomain.getAll({
+      instanceId: instance._id,
+    });
+    let origin = 'https://' + instance.domain;
+    if (domains.length > 0) {
+      const selectedDomain = await prompt<{ domain: string }>([
+        {
+          message: 'Which domain would you like to use?',
+          name: 'domain',
+          type: 'list',
+          choices: [
+            {
+              name: 'localhost',
+              value: 'localhost',
+            },
+            {
+              name: instance.domain,
+              value: instance.domain,
+            },
+            ...domains.map((domain) => {
+              return {
+                name: domain.name,
+                value: domain.name,
+              };
+            }),
+          ],
+        },
+      ]);
+      if (selectedDomain.domain === 'localhost') {
+        origin = `http://localhost:8080`;
+      } else {
+        const protocol = await prompt<{ value: string }>([
+          {
+            message: 'Which protocol should be used?',
+            name: 'value',
+            type: 'list',
+            choices: [
+              {
+                name: 'HTTP',
+                value: 'http',
+              },
+              {
+                name: 'HTTPS',
+                value: 'https',
+              },
+            ],
+          },
+        ]);
+        origin = `${protocol.value}://${selectedDomain.domain}`;
+      }
+    }
+    return origin;
   }
 }

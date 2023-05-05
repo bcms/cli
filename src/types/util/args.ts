@@ -1,4 +1,5 @@
 export interface Args {
+  userId?: string;
   help?: boolean;
   bundle?: boolean;
   plugin?: string;

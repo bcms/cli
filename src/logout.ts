@@ -1,11 +1,11 @@
-import type { ApiClient } from '@becomes/cms-cloud-client/types';
+import type { BCMSCloudSdk } from '@becomes/cms-cloud-client';
 import type { Args } from './types';
 
 export async function logout({
   client,
 }: {
   args: Args;
-  client: ApiClient;
+  client: BCMSCloudSdk;
 }): Promise<void> {
   try {
     await client.auth.logout();

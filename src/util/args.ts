@@ -43,6 +43,9 @@ export function parseArgs(rawArgs: string[]): Args {
       type: 'string' | 'boolean';
     };
   } = {
+    userId: {
+      type: 'string',
+    },
     login: {
       type: 'boolean',
     },
@@ -167,6 +170,8 @@ export function parseArgs(rawArgs: string[]): Args {
     [name: string]: string;
   } = {
     '--login': groups.login.name,
+
+    '--userId': groups.userId.name,
 
     '--logout': groups.logout.name,
 

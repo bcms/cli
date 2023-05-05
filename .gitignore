@@ -21,6 +21,7 @@
 /__bcms_tmp
 /bcms_backup_*
 /my-bcms-website
+/my-cms
 
 # Logs
 /log

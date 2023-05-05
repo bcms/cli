@@ -1,11 +1,6 @@
 import { randomBytes } from 'crypto';
 import { DockerUtil, Select } from './util';
 import { prompt } from 'inquirer';
-import type {
-  ApiClient,
-  InstanceProtected,
-  Org,
-} from '@becomes/cms-cloud-client/types';
 import { login } from './login';
 import { Config } from './config';
 import { Docker } from '@banez/docker';
@@ -18,6 +13,11 @@ import type { Args } from './types';
 import { StringUtility } from '@banez/string-utility';
 import { ObjectUtility } from '@becomes/purple-cheetah';
 import { ObjectUtilityError } from '@becomes/purple-cheetah/types';
+import type {
+  BCMSCloudSdk,
+  InstanceProtectedWithStatus,
+  Org,
+} from '@becomes/cms-cloud-client';
 
 export class Instance {
   static async resolve({
@@ -25,7 +25,7 @@ export class Instance {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (args.instance === 'install' || args.install) {
       await this.install({ args, client });
@@ -39,7 +39,7 @@ export class Instance {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (!(await DockerUtil.setup({ args }))) {
       return;
@@ -268,7 +268,7 @@ export class Instance {
     client,
   }: {
     args: Args;
-    client: ApiClient;
+    client: BCMSCloudSdk;
   }): Promise<void> {
     if (!(await client.isLoggedIn())) {
       await login({ args, client });
@@ -283,8 +283,10 @@ export class Instance {
      */
 
     const instances = await client.instance.getAll();
-    let instance: InstanceProtected = args.instanceId
-      ? (instances.find((e) => e._id === args.instanceId) as InstanceProtected)
+    let instance: InstanceProtectedWithStatus = args.instanceId
+      ? (instances.find(
+          (e) => e._id === args.instanceId,
+        ) as InstanceProtectedWithStatus)
       : (null as never);
     let org: Org | null = null;
     if (instance) {
@@ -304,7 +306,7 @@ export class Instance {
         const files = await Config.server.linux.homeFs.readdir(licensesPath);
         const options: Array<{
           text: string;
-          instance: InstanceProtected;
+          instance: InstanceProtectedWithStatus;
           org: Org;
         }> = [];
         for (let i = 0; i < files.length; i++) {
@@ -324,7 +326,7 @@ export class Instance {
         }
         const result = await prompt<{
           select: {
-            instance?: InstanceProtected;
+            instance?: InstanceProtectedWithStatus;
             org?: Org;
           };
         }>([
@@ -381,7 +383,6 @@ export class Instance {
     if (!license.value) {
       await client.instance.issueDownloadLicenseCode({
         instanceId: instance._id,
-        orgId: org._id,
       });
       const result = await prompt<{ code: string }>([
         {
@@ -397,10 +398,9 @@ export class Instance {
       const instanceLicense = await client.instance.downloadLicenseWithCode({
         code: result.code,
         instanceId: instance._id,
-        orgId: org._id,
       });
-      license.fileName = `${instanceLicense.id}.license`;
-      license.value = instanceLicense.key;
+      license.fileName = `${instance._id}.license`;
+      license.value = instanceLicense;
       await Config.server.linux.homeFs.save(
         [licensesPath, license.fileName],
         license.value,
