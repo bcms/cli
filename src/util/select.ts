@@ -6,7 +6,11 @@ import type {
 import { prompt } from 'inquirer';
 
 export class Select {
-  static async cloudOrLocal({ client }: { client: BCMSCloudSdk }): Promise<{
+  static async cloudOrLocal({
+    client,
+  }: {
+    client: BCMSCloudSdk;
+  }): Promise<{
     local?: boolean;
     cloud?: {
       instance: InstanceProtectedWithStatus;
@@ -39,7 +43,11 @@ export class Select {
     };
   }
 
-  static async orgAndInstance({ client }: { client: BCMSCloudSdk }): Promise<{
+  static async orgAndInstance({
+    client,
+  }: {
+    client: BCMSCloudSdk;
+  }): Promise<{
     org: Org;
     instance: InstanceProtectedWithStatus;
   }> {
@@ -80,13 +88,17 @@ export class Select {
     const instance = instances.find((e) => e._id === instResult.instanceId);
     if (!instance) {
       throw Error(
-        `Instance with ID "${instResult.instanceId}" does not exist.`,
+        `Instance with ID "${instResult.instanceId}" does not exist.`
       );
     }
     return { org, instance };
   }
 
-  static async instance({ client }: { client: BCMSCloudSdk }): Promise<{
+  static async instance({
+    client,
+  }: {
+    client: BCMSCloudSdk;
+  }): Promise<{
     instance: InstanceProtectedWithStatus;
   }> {
     const instances = await client.instance.getAll();
@@ -106,7 +118,7 @@ export class Select {
     const instance = instances.find((e) => e._id === instResult.instanceId);
     if (!instance) {
       throw Error(
-        `Instance with ID "${instResult.instanceId}" does not exist.`,
+        `Instance with ID "${instResult.instanceId}" does not exist.`
       );
     }
     return { instance };
@@ -123,52 +135,50 @@ export class Select {
       instanceId: instance._id,
     });
     let origin = 'https://' + instance.domain;
-    if (domains.length > 0) {
-      const selectedDomain = await prompt<{ domain: string }>([
+    const selectedDomain = await prompt<{ domain: string }>([
+      {
+        message: 'Which domain would you like to use?',
+        name: 'domain',
+        type: 'list',
+        choices: [
+          {
+            name: 'localhost',
+            value: 'localhost',
+          },
+          {
+            name: instance.domain,
+            value: instance.domain,
+          },
+          ...domains.map((domain) => {
+            return {
+              name: domain.name,
+              value: domain.name,
+            };
+          }),
+        ],
+      },
+    ]);
+    if (selectedDomain.domain === 'localhost') {
+      origin = `http://localhost:8080`;
+    } else {
+      const protocol = await prompt<{ value: string }>([
         {
-          message: 'Which domain would you like to use?',
-          name: 'domain',
+          message: 'Which protocol should be used?',
+          name: 'value',
           type: 'list',
           choices: [
             {
-              name: 'localhost',
-              value: 'localhost',
+              name: 'HTTP',
+              value: 'http',
             },
             {
-              name: instance.domain,
-              value: instance.domain,
+              name: 'HTTPS',
+              value: 'https',
             },
-            ...domains.map((domain) => {
-              return {
-                name: domain.name,
-                value: domain.name,
-              };
-            }),
           ],
         },
       ]);
-      if (selectedDomain.domain === 'localhost') {
-        origin = `http://localhost:8080`;
-      } else {
-        const protocol = await prompt<{ value: string }>([
-          {
-            message: 'Which protocol should be used?',
-            name: 'value',
-            type: 'list',
-            choices: [
-              {
-                name: 'HTTP',
-                value: 'http',
-              },
-              {
-                name: 'HTTPS',
-                value: 'https',
-              },
-            ],
-          },
-        ]);
-        origin = `${protocol.value}://${selectedDomain.domain}`;
-      }
+      origin = `${protocol.value}://${selectedDomain.domain}`;
     }
     return origin;
   }

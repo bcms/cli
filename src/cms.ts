@@ -153,7 +153,7 @@ export class CMS {
     ]);
     const { confirm } = await prompt<{ confirm: boolean }>([
       {
-        message: `Are you sure you want to restore data to: ${instance.name}?`,
+        message: `Are you sure you want to restore data to: ${instance.name} - ${origin}?`,
         type: 'confirm',
         name: 'confirm',
       },
