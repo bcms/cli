@@ -537,15 +537,15 @@ export class Instance {
                   type: 'list',
                   choices: [
                     {
-                      name: 'Automatic - CLI will setup recommended DB on your server',
+                      name: 'Automatic (Recommended) - CLI will setup recommended DB on this server',
                       value: 'auto',
                     },
                     {
-                      name: 'MongoDB Atlas',
+                      name: 'MongoDB Cluster - Managed MongoDB database (DBaaS)',
                       value: 'mongoAtlas',
                     },
                     {
-                      name: 'MongoDB Self-hosted',
+                      name: 'MongoDB Self-hosted - You have configured MongoDB on some server',
                       value: 'mongoSelfHosted',
                     },
                   ],
@@ -703,6 +703,7 @@ export class Instance {
       },
     ]).run();
     await Shim.install({ args, client });
+    await client.auth.logout();
     console.log('All done!');
   }
 }
