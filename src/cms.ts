@@ -383,7 +383,6 @@ export class CMS {
       }
     }
     await sdk3.user.logout();
-    // await tmpFs.deleteDir('');
   }
 
   static async backup({
