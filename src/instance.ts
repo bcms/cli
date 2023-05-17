@@ -16,7 +16,6 @@ import { ObjectUtilityError } from '@becomes/purple-cheetah/types';
 import type {
   BCMSCloudSdk,
   InstanceProtectedWithStatus,
-  Org,
 } from '@becomes/cms-cloud-client';
 
 export class Instance {
@@ -270,6 +269,7 @@ export class Instance {
     args: Args;
     client: BCMSCloudSdk;
   }): Promise<void> {
+    console.log(args)
     if (!(await client.isLoggedIn())) {
       await login({ args, client });
     }
@@ -281,7 +281,6 @@ export class Instance {
     /**
      * Get license
      */
-
     const instances = await client.instance.getAll();
     let instance: InstanceProtectedWithStatus = args.instanceId
       ? (instances.find(
@@ -293,79 +292,82 @@ export class Instance {
       value: '',
     };
     const licensesPath = 'licenses';
-    if (await Config.server.linux.homeFs.exist(licensesPath)) {
-      if (!instance) {
-        const files = await Config.server.linux.homeFs.readdir(licensesPath);
-        const options: Array<{
-          text: string;
-          instance: InstanceProtectedWithStatus;
-          org: Org;
-        }> = [];
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          const instanceId = file.split('.')[0];
-          const _instance = instances.find((e) => e._id === instanceId);
-          if (_instance) {
-            const _org = await client.org.get({ id: _instance.org.id });
-            if (_org) {
-              options.push({
-                instance: _instance,
-                org: _org,
-                text: `${_org.name} - ${_instance.name}`,
-              });
-            }
-          }
-        }
-        const result = await prompt<{
-          select: {
-            instance?: InstanceProtectedWithStatus;
-            org?: Org;
-          };
-        }>([
-          {
-            type: 'list',
-            message: 'Which license would you like to use?',
-            name: 'select',
-            choices: [
-              ...options.map((e) => {
-                return {
-                  name: e.text,
-                  value: {
-                    org: e.org,
-                    instance: e.instance,
-                  },
-                };
-              }),
-              {
-                name: 'Other...',
-                value: {},
-              },
-            ],
-          },
-        ]);
-        if (result.select.instance && result.select.org) {
-          instance = result.select.instance;
-          license.fileName = instance._id + '.license';
-          license.value = await Config.server.linux.homeFs.readString([
-            licensesPath,
-            license.fileName,
-          ]);
-        }
-      } else if (
-        await Config.server.linux.homeFs.exist(
-          [licensesPath, instance._id + '.license'],
-          true,
-        )
-      ) {
-        license.fileName = instance._id + '.license';
-        license.value = await Config.server.linux.homeFs.readString([
-          licensesPath,
-          license.fileName,
-        ]);
-      }
-    } else {
+    if (!(await Config.server.linux.homeFs.exist(licensesPath))) {
       await Config.server.linux.homeFs.mkdir(licensesPath);
     }
+    // if (await Config.server.linux.homeFs.exist(licensesPath)) {
+    //   if (!instance) {
+    //     const files = await Config.server.linux.homeFs.readdir(licensesPath);
+    //     const options: Array<{
+    //       text: string;
+    //       instance: InstanceProtectedWithStatus;
+    //       org: Org;
+    //     }> = [];
+    //     for (let i = 0; i < files.length; i++) {
+    //       const file = files[i];
+    //       const instanceId = file.split('.')[0];
+    //       const _instance = instances.find((e) => e._id === instanceId);
+    //       if (_instance) {
+    //         const _org = await client.org.get({ id: _instance.org.id });
+    //         if (_org) {
+    //           options.push({
+    //             instance: _instance,
+    //             org: _org,
+    //             text: `${_org.name} - ${_instance.name}`,
+    //           });
+    //         }
+    //       }
+    //     }
+    //     const result = await prompt<{
+    //       select: {
+    //         instance?: InstanceProtectedWithStatus;
+    //         org?: Org;
+    //       };
+    //     }>([
+    //       {
+    //         type: 'list',
+    //         message: 'Which license would you like to use?',
+    //         name: 'select',
+    //         choices: [
+    //           ...options.map((e) => {
+    //             return {
+    //               name: e.text,
+    //               value: {
+    //                 org: e.org,
+    //                 instance: e.instance,
+    //               },
+    //             };
+    //           }),
+    //           {
+    //             name: 'Other...',
+    //             value: {},
+    //           },
+    //         ],
+    //       },
+    //     ]);
+    //     if (result.select.instance && result.select.org) {
+    //       instance = result.select.instance;
+    //       license.fileName = instance._id + '.license';
+    //       license.value = await Config.server.linux.homeFs.readString([
+    //         licensesPath,
+    //         license.fileName,
+    //       ]);
+    //     }
+    //   } else if (
+    //     await Config.server.linux.homeFs.exist(
+    //       [licensesPath, instance._id + '.license'],
+    //       true,
+    //     )
+    //   ) {
+    //     license.fileName = instance._id + '.license';
+    //     license.value = await Config.server.linux.homeFs.readString([
+    //       licensesPath,
+    //       license.fileName,
+    //     ]);
+    //   }
+    // } else {
+    //   await Config.server.linux.homeFs.mkdir(licensesPath);
+    // }
     if (!instance) {
       const orgInstResult = await Select.instance({ client });
       instance = orgInstResult.instance;
