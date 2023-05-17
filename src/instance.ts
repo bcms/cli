@@ -288,21 +288,13 @@ export class Instance {
           (e) => e._id === args.instanceId,
         ) as InstanceProtectedWithStatus)
       : (null as never);
-    let org: Org | null = null;
-    if (instance) {
-      try {
-        org = await client.org.get({ id: instance.org.id });
-      } catch (_error) {
-        // Do nothing
-      }
-    }
     const license = {
       fileName: '',
       value: '',
     };
     const licensesPath = 'licenses';
     if (await Config.server.linux.homeFs.exist(licensesPath)) {
-      if (!instance || !org) {
+      if (!instance) {
         const files = await Config.server.linux.homeFs.readdir(licensesPath);
         const options: Array<{
           text: string;
@@ -352,7 +344,6 @@ export class Instance {
           },
         ]);
         if (result.select.instance && result.select.org) {
-          org = result.select.org;
           instance = result.select.instance;
           license.fileName = instance._id + '.license';
           license.value = await Config.server.linux.homeFs.readString([
@@ -375,10 +366,9 @@ export class Instance {
     } else {
       await Config.server.linux.homeFs.mkdir(licensesPath);
     }
-    if (!instance || !org) {
-      const orgInstResult = await Select.orgAndInstance({ client });
+    if (!instance) {
+      const orgInstResult = await Select.instance({ client });
       instance = orgInstResult.instance;
-      org = orgInstResult.org;
     }
     if (!license.value) {
       await client.instance.issueDownloadLicenseCode({
