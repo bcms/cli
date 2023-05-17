@@ -269,7 +269,6 @@ export class Instance {
     args: Args;
     client: BCMSCloudSdk;
   }): Promise<void> {
-    console.log(args)
     if (!(await client.isLoggedIn())) {
       await login({ args, client });
     }
