@@ -94,8 +94,9 @@ export class Website {
             const sdk = createSdk3({
               origin: apiOrigin,
             });
+            const user = await client.user.get();
             const otp = await client.user.getOtp();
-            await sdk.shim.verify.otp(otp);
+            await sdk.shim.verify.otp(`${user._id}_${otp}`);
             const apiKeys = await sdk.apiKey.getAll();
             let apiKey: BCMSApiKey | undefined;
             if (apiKeys.length > 0) {
