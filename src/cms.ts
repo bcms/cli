@@ -83,7 +83,7 @@ export class CMS {
     }
     Terminal.render();
     const backupList = (await fs.readdir('')).filter(
-      (e) => e.startsWith('bcms_backup_') && e.endsWith('.zip')
+      (e) => e.startsWith('bcms_backup_') && e.endsWith('.zip'),
     );
     if (backupList.length === 0) {
       throw Error('There are no backup files in current directory.');
@@ -195,7 +195,7 @@ export class CMS {
               const dbFile = dbFiles.find((e) => e.endsWith('_templates.json'));
               if (dbFile) {
                 const items = JSON.parse(
-                  await tmpFs.readString(['db', dbFile])
+                  await tmpFs.readString(['db', dbFile]),
                 );
                 await sdk3.backup.restoreEntities({
                   type: 'template',
@@ -209,7 +209,7 @@ export class CMS {
               const dbFile = dbFiles.find((e) => e.endsWith('_groups.json'));
               if (dbFile) {
                 const items = JSON.parse(
-                  await tmpFs.readString(['db', dbFile])
+                  await tmpFs.readString(['db', dbFile]),
                 );
                 await sdk3.backup.restoreEntities({
                   type: 'group',
@@ -223,7 +223,7 @@ export class CMS {
               const dbFile = dbFiles.find((e) => e.endsWith('_widgets.json'));
               if (dbFile) {
                 const items = JSON.parse(
-                  await tmpFs.readString(['db', dbFile])
+                  await tmpFs.readString(['db', dbFile]),
                 );
                 await sdk3.backup.restoreEntities({
                   type: 'widget',
@@ -235,11 +235,11 @@ export class CMS {
           case 'ID Counters':
             {
               const dbFile = dbFiles.find((e) =>
-                e.endsWith('_id_counters.json')
+                e.endsWith('_id_counters.json'),
               );
               if (dbFile) {
                 const items = JSON.parse(
-                  await tmpFs.readString(['db', dbFile])
+                  await tmpFs.readString(['db', dbFile]),
                 );
                 await sdk3.backup.restoreEntities({
                   type: 'idc',
@@ -253,7 +253,7 @@ export class CMS {
               const dbFile = dbFiles.find((e) => e.endsWith('_medias.json'));
               if (dbFile) {
                 const items = JSON.parse(
-                  await tmpFs.readString(['db', dbFile])
+                  await tmpFs.readString(['db', dbFile]),
                 ) as BCMSMedia[];
                 await sdk3.backup.restoreEntities({
                   type: 'media',
@@ -271,7 +271,7 @@ export class CMS {
                   component: progress,
                 });
                 const fileItems = items.filter(
-                  (e) => e.type !== BCMSMediaType.DIR
+                  (e) => e.type !== BCMSMediaType.DIR,
                 );
                 for (let k = 0; k < fileItems.length; k++) {
                   const item = fileItems[k];
@@ -291,7 +291,7 @@ export class CMS {
                     if (
                       await tmpFs.exist(
                         ['uploads', ...pathToFile.split('/')],
-                        true
+                        true,
                       )
                     ) {
                       const buffer = await tmpFs.read([
@@ -317,7 +317,7 @@ export class CMS {
               const dbFile = dbFiles.find((e) => e.endsWith('_api_keys.json'));
               if (dbFile) {
                 const items = JSON.parse(
-                  await tmpFs.readString(['db', dbFile])
+                  await tmpFs.readString(['db', dbFile]),
                 );
                 await sdk3.backup.restoreEntities({
                   type: 'apiKey',
@@ -330,9 +330,11 @@ export class CMS {
             {
               const dbFile = dbFiles.find((e) => e.endsWith('_languages.json'));
               if (dbFile) {
-                const items = (JSON.parse(
-                  await tmpFs.readString(['db', dbFile])
-                ) as BCMSLanguage[]).filter((e) => e.code !== 'en');
+                const items = (
+                  JSON.parse(
+                    await tmpFs.readString(['db', dbFile]),
+                  ) as BCMSLanguage[]
+                ).filter((e) => e.code !== 'en');
                 await sdk3.backup.restoreEntities({
                   type: 'language',
                   items,
@@ -345,7 +347,7 @@ export class CMS {
               const dbFile = dbFiles.find((e) => e.endsWith('_entries.json'));
               if (dbFile) {
                 const items = JSON.parse(
-                  await tmpFs.readString(['db', dbFile])
+                  await tmpFs.readString(['db', dbFile]),
                 );
                 await sdk3.backup.restoreEntities({
                   type: 'entry',
@@ -359,7 +361,7 @@ export class CMS {
               const dbFile = dbFiles.find((e) => e.endsWith('_statuses.json'));
               if (dbFile) {
                 const items = JSON.parse(
-                  await tmpFs.readString(['db', dbFile])
+                  await tmpFs.readString(['db', dbFile]),
                 );
                 await sdk3.backup.restoreEntities({
                   type: 'status',
@@ -514,8 +516,8 @@ export class CMS {
                 return { name: e.name, version: e.version };
               }),
               null,
-              '  '
-            )
+              '  ',
+            ),
           );
         },
       },
@@ -538,11 +540,11 @@ export class CMS {
     if (instanceId) {
       const instances = await client.instance.getAll();
       instance = instances.find(
-        (e) => e._id === instanceId
+        (e) => e._id === instanceId,
       ) as InstanceProtectedWithStatus;
       if (!instance) {
         throw Error(
-          `Instance with ID "${instanceId}" cannot be found on your account.`
+          `Instance with ID "${instanceId}" cannot be found on your account.`,
         );
       }
     } else {
@@ -566,7 +568,7 @@ export class CMS {
     async function pushFje(
       namespace: string,
       logName: string,
-      fjeType: InstanceFJEType
+      fjeType: InstanceFJEType,
     ) {
       const fjes = (
         await client.instanceFje.getAllByType({
@@ -576,7 +578,7 @@ export class CMS {
       ).filter((e) => e.external);
       if (await fs.exist(['dist', namespace])) {
         const files = (await fs.readdir(['dist', namespace])).filter((e) =>
-          e.endsWith('.js')
+          e.endsWith('.js'),
         );
         const fnNames: string[] = [];
         for (let i = 0; i < files.length; i++) {
@@ -585,6 +587,7 @@ export class CMS {
           const file = await fs.readString(['dist', namespace, fileName]);
           const itemName = fileName.replace('.js', '');
           const existingFje = fjes.find((e) => e.name === itemName);
+          fnNames.push(itemName);
           if (existingFje) {
             process.stdout.write(`Updating ${logName}: ${itemName} ...`);
             try {
@@ -596,9 +599,9 @@ export class CMS {
                   raw: file,
                 },
               });
-              process.stdout.write('DONE\n');
+              process.stdout.write(' - DONE\n');
             } catch (error) {
-              process.stdout.write('FAIL\n');
+              process.stdout.write(' - FAIL\n');
               console.warn(error);
             }
           } else {
@@ -613,9 +616,9 @@ export class CMS {
                   raw: file,
                 },
               });
-              process.stdout.write('DONE\n');
+              process.stdout.write(' - DONE\n');
             } catch (error) {
-              process.stdout.write('FAIL\n');
+              process.stdout.write(' - FAIL\n');
               console.warn(error);
             }
           }
@@ -629,9 +632,9 @@ export class CMS {
                 instanceId: instance._id,
                 id: fje._id,
               });
-              process.stdout.write('DONE\n');
+              process.stdout.write(' - DONE\n');
             } catch (error) {
-              process.stdout.write('FAIL\n');
+              process.stdout.write(' - FAIL\n');
               console.log(error);
             }
           }
@@ -645,9 +648,9 @@ export class CMS {
               instanceId: instance._id,
               id: fje._id,
             });
-            process.stdout.write('DONE\n');
+            process.stdout.write(' - DONE\n');
           } catch (error) {
-            process.stdout.write('FAIL\n');
+            process.stdout.write(' - FAIL\n');
             console.log(error);
           }
         }
@@ -739,7 +742,7 @@ export class CMS {
           task: async () => {
             if (await fs.exist(['dist', 'deps.json'], true)) {
               const deps: InstanceDep[] = JSON.parse(
-                await fs.readString(['dist', 'deps.json'])
+                await fs.readString(['dist', 'deps.json']),
               );
               const existingDeps = await client.instanceDep.getAll({
                 instanceId: instance._id,
@@ -747,7 +750,7 @@ export class CMS {
               for (let i = 0; i < deps.length; i++) {
                 const dep = deps[i];
                 const existingDep = existingDeps.find(
-                  (e) => e.name === dep.name
+                  (e) => e.name === dep.name,
                 );
                 try {
                   if (existingDep) {
@@ -756,18 +759,19 @@ export class CMS {
                       _id: existingDep._id,
                       instanceId: existingDep.instanceId,
                       name: dep.name,
-                      version: dep.name,
+                      version: dep.version,
                     });
                   } else {
                     process.stdout.write(`Creating dependency: ${dep.name}`);
                     await client.instanceDep.create({
                       instanceId: instance._id,
                       name: dep.name,
-                      version: dep.name,
+                      version: dep.version,
                     });
                   }
+                  process.stdout.write(' - DONE\n')
                 } catch (error) {
-                  process.stdout.write('FAIL\n');
+                  process.stdout.write(' - FAIL\n');
                   console.error(error);
                 }
               }
@@ -816,7 +820,7 @@ export class CMS {
     console.log(
       'Creating data bundle.',
       'Please wait, this might take a few minutes.',
-      'This depends on the BCMS data size.'
+      'This depends on the BCMS data size.',
     );
     const backupPromise = new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -847,7 +851,7 @@ export class CMS {
           clearInterval(interval);
           unsub();
           resolve();
-        }
+        },
       );
     });
     let backupItem = await sdk.backup.create({ media: true });
@@ -863,7 +867,7 @@ export class CMS {
     const totalLength = parseInt(res.headers['content-length']);
     let downloadedLength = 0;
     const writer = nodeFs.createWriteStream(
-      path.join(process.cwd(), 'temp.zip')
+      path.join(process.cwd(), 'temp.zip'),
     );
     const data = res.data as Stream;
     data.pipe(writer);
@@ -923,7 +927,7 @@ export class CMS {
       }
       await fs.save(
         ['db', 'bcms', fileName],
-        JSON.stringify(output, null, '  ')
+        JSON.stringify(output, null, '  '),
       );
     }
     console.log('Cleanup ...');
@@ -982,7 +986,7 @@ export class CMS {
         '$ docker-compose up',
         '',
         '',
-      ].join('\n')
+      ].join('\n'),
     );
   }
 }
