@@ -769,7 +769,7 @@ export class CMS {
                       version: dep.version,
                     });
                   }
-                  process.stdout.write(' - DONE\n')
+                  process.stdout.write(' - DONE\n');
                 } catch (error) {
                   process.stdout.write(' - FAIL\n');
                   console.error(error);
@@ -957,9 +957,9 @@ export class CMS {
         },
       },
       {
-        title: 'Install dependencies',
+        title: 'Prepare repository',
         task: async () => {
-          await ChildProcess.spawn('npm', ['i'], {
+          await ChildProcess.spawn('node', ['post-cms-create.js'], {
             stdio: 'inherit',
             cwd: path.join(process.cwd(), answers.projectName),
           });
