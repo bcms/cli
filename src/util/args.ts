@@ -152,6 +152,10 @@ export function parseArgs(rawArgs: string[]): Args {
     plugin: {
       type: 'string',
     },
+
+    projectName: {
+      type: 'string',
+    },
   };
   const groups: {
     [name: string]: {
@@ -177,7 +181,6 @@ export function parseArgs(rawArgs: string[]): Args {
 
     '--bundle': groups.bundle.name,
     '--b': groups.bundle.name,
-
 
     '--create': groups.create.name,
     '--c': groups.create.name,
@@ -255,6 +258,8 @@ export function parseArgs(rawArgs: string[]): Args {
     '--job': groups.job.name,
     '--plugin': groups.plugin.name,
     '--pl': groups.plugin.name,
+
+    '--project-name': groups.projectName.name,
   };
   const output: {
     [name: string]: string | boolean | undefined;

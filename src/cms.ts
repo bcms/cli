@@ -56,7 +56,7 @@ export class CMS {
     } else if (args.cms === 'restore') {
       await this.restore({ client, args });
     } else if (args.cms === 'create') {
-      await this.create();
+      await this.create({ args });
     } else if (args.cms === 'dump') {
       await this.dump({ args, client });
     }
@@ -935,15 +935,17 @@ export class CMS {
     await fs.deleteDir('temp');
   }
 
-  static async create(): Promise<void> {
-    const answers = await prompt<{ projectName: string }>([
-      {
-        name: 'projectName',
-        message: 'Enter a project name',
-        type: 'input',
-        default: 'my-bcms',
-      },
-    ]);
+  static async create({ args }: { args: Args }): Promise<void> {
+    const answers = args.projectName
+      ? { projectName: args.projectName }
+      : await prompt<{ projectName: string }>([
+          {
+            name: 'projectName',
+            message: 'Enter a project name',
+            type: 'input',
+            default: 'my-bcms',
+          },
+        ]);
 
     await createTasks([
       {

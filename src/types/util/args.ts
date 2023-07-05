@@ -37,4 +37,6 @@ export interface Args {
   function?: 'create';
   event?: 'create';
   job?: 'create';
+
+  projectName?: string;
 }
