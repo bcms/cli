@@ -152,12 +152,15 @@ export class Website {
                 `NEXT_PUBLIC_BCMS_API_ORIGIN=${apiOrigin}`,
                 `NEXT_PUBLIC_BCMS_API_PUBLIC_KEY_ID=${apiKey._id}`,
               ];
-            } else if (answers.projectType === 'Nuxt') {
+            } else if (
+              answers.projectType === 'Nuxt 3' ||
+              answers.projectType === 'Nuxt 2'
+            ) {
               additionalEnvVars = [
                 `NUXT_PUBLIC_BCMS_API_ORIGIN=${apiOrigin}`,
                 `NUXT_PUBLIC_BCMS_API_KEY_ID=${apiKey._id}`,
                 `NUXT_PUBLIC_BCMS_ENABLE_CLIENT_CACHE=false`,
-                `NUXT_PUBLIC_BCMS_CLIENT_DEBUG=false`
+                `NUXT_PUBLIC_BCMS_CLIENT_DEBUG=false`,
               ];
             } else if (answers.projectType === 'Gatsby') {
               additionalEnvVars = [
