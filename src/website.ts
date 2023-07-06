@@ -154,8 +154,10 @@ export class Website {
               ];
             } else if (answers.projectType === 'Nuxt') {
               additionalEnvVars = [
-                `NUXT_ENV_BCMS_API_ORIGIN=${apiOrigin}`,
-                `NUXT_ENV_BCMS_API_PUBLIC_KEY=${apiKey._id}`,
+                `NUXT_PUBLIC_BCMS_API_ORIGIN=${apiOrigin}`,
+                `NUXT_PUBLIC_BCMS_API_KEY_ID=${apiKey._id}`,
+                `NUXT_PUBLIC_BCMS_ENABLE_CLIENT_CACHE=false`,
+                `NUXT_PUBLIC_BCMS_CLIENT_DEBUG=false`
               ];
             } else if (answers.projectType === 'Gatsby') {
               additionalEnvVars = [
