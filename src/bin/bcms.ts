@@ -31,7 +31,6 @@ import { getVersionInfo } from '../check-version';
 
 async function main() {
   const updateCliInfo = await getVersionInfo();
-  console.log(updateCliInfo);
   if (updateCliInfo.local !== 'none' || updateCliInfo.global) {
     const answer = await prompt<{ yes: boolean }>([
       {

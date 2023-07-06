@@ -6,7 +6,6 @@ export interface UpdateCliData {
 }
 
 export async function updateCli(data: UpdateCliData): Promise<void> {
-  console.log(data);
   if (data.local !== 'none') {
     if (data.local === 'dev') {
       await ChildProcess.spawn('npm', ['i', '-D', '@becomes/cms-cli@latest'], {

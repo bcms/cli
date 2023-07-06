@@ -53,7 +53,6 @@ export async function getVersionInfo(): Promise<UpdateCliData> {
       const packageName = listInfo.split('\n')[1];
       if (packageName.includes('@becomes/cms-cli')) {
         const version = packageName.split('@')[2].split('\n')[0];
-        console.log({ version, packageName });
         if (currVersion !== version) {
           data.global = true;
         }
