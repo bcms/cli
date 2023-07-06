@@ -16,10 +16,7 @@ export async function getVersionInfo(): Promise<UpdateCliData> {
     const res = await axios({
       url: 'https://raw.githubusercontent.com/bcms/cli/master/versions.json',
     });
-    currVersion = res.data.curr
-      .split('.')
-      .map((e: string) => e.slice(e.length - 1, e.length))
-      .join('.');
+    currVersion = res.data.curr;
   } catch (error) {
     // Do nothing.
     return data;
