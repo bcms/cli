@@ -25,8 +25,27 @@ import { Most } from '../most';
 import { Shim } from '../shim';
 import { help } from '../help';
 import { Website } from '../website';
+import { prompt } from 'inquirer';
+import { updateCli } from '../update-cli';
+import { getVersionInfo } from '../check-version';
 
 async function main() {
+  const updateCliInfo = await getVersionInfo();
+  console.log(updateCliInfo);
+  if (updateCliInfo.local !== 'none' || updateCliInfo.global) {
+    const answer = await prompt<{ yes: boolean }>([
+      {
+        message:
+          'New version of the CLI is available. Would you like to update it?',
+        type: 'confirm',
+        name: 'yes',
+      },
+    ]);
+    if (answer.yes) {
+      await updateCli(updateCliInfo);
+      return;
+    }
+  }
   const fs = createFS({
     base: Config.fsDir,
   });
