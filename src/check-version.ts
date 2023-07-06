@@ -30,14 +30,32 @@ export async function getVersionInfo(): Promise<UpdateCliData> {
       packageJson.dependencies &&
       packageJson.dependencies['@becomes/cms-cli']
     ) {
-      if (packageJson.dependencies['@becomes/cms-cli'] !== currVersion) {
+      let verString: string = packageJson.dependencies['@becomes/cms-cli'];
+      for (let i = 0; i < verString.length; i++) {
+        const char = verString[i];
+        const charNum = parseInt(char);
+        if (!isNaN(charNum)) {
+          verString = verString.slice(i);
+          break;
+        }
+      }
+      if (verString !== currVersion) {
         data.local = 'prod';
       }
     } else if (
       packageJson.devDependencies &&
       packageJson.devDependencies['@becomes/cms-cli']
     ) {
-      if (packageJson.devDependencies['@becomes/cms-cli'] !== currVersion) {
+      let verString: string = packageJson.devDependencies['@becomes/cms-cli'];
+      for (let i = 0; i < verString.length; i++) {
+        const char = verString[i];
+        const charNum = parseInt(char);
+        if (!isNaN(charNum)) {
+          verString = verString.slice(i);
+          break;
+        }
+      }
+      if (verString !== currVersion) {
         data.local = 'dev';
       }
     }

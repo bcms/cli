@@ -24,7 +24,11 @@ export async function updateCli(data: UpdateCliData): Promise<void> {
     }
   }
   if (data.global) {
-    await ChildProcess.spawn('npm', ['i', '-g', '@becomes/cms-cli@latest']);
+    await ChildProcess.advancedExec('npm i -g @becomes/cms-cli@latest', {
+      onChunk(type, chunk) {
+        process[type].write(chunk);
+      },
+    }).awaiter;
   }
   console.log('\n\n\n\n\n', 'BCMS CLI updated successfully\n\n\n\n\n');
 }
