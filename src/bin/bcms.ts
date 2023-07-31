@@ -48,7 +48,6 @@ async function main() {
         ]);
     if (answer.yes) {
       await updateCli(updateCliInfo);
-      return;
     }
   }
   const fs = createFS({
