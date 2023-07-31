@@ -30,16 +30,22 @@ import { updateCli } from '../update-cli';
 import { getVersionInfo } from '../check-version';
 
 async function main() {
+  const args = parseArgs(process.argv);
+  if (!args.cloudOrigin) {
+    args.cloudOrigin = 'https://cloud.thebcms.com';
+  }
   const updateCliInfo = await getVersionInfo();
   if (updateCliInfo.local !== 'none' || updateCliInfo.global) {
-    const answer = await prompt<{ yes: boolean }>([
-      {
-        message:
-          'New version of the CLI is available. Would you like to update it?',
-        type: 'confirm',
-        name: 'yes',
-      },
-    ]);
+    const answer = args.noPrompt
+      ? { yes: true }
+      : await prompt<{ yes: boolean }>([
+          {
+            message:
+              'New version of the CLI is available. Would you like to update it?',
+            type: 'confirm',
+            name: 'yes',
+          },
+        ]);
     if (answer.yes) {
       await updateCli(updateCliInfo);
       return;
@@ -51,10 +57,6 @@ async function main() {
   const rootFs = createFS({
     base: process.cwd(),
   });
-  const args = parseArgs(process.argv);
-  if (!args.cloudOrigin) {
-    args.cloudOrigin = 'https://cloud.thebcms.com';
-  }
   if (!(await fs.exist(Config.fsDir))) {
     await fs.mkdir(Config.fsDir);
   }

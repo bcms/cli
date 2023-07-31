@@ -156,6 +156,10 @@ export function parseArgs(rawArgs: string[]): Args {
     projectName: {
       type: 'string',
     },
+
+    noPrompt: {
+      type: 'boolean',
+    },
   };
   const groups: {
     [name: string]: {
@@ -260,6 +264,8 @@ export function parseArgs(rawArgs: string[]): Args {
     '--pl': groups.plugin.name,
 
     '--project-name': groups.projectName.name,
+
+    '--no-prompt': groups.noPrompt.name,
   };
   const output: {
     [name: string]: string | boolean | undefined;

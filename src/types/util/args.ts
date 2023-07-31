@@ -39,4 +39,6 @@ export interface Args {
   job?: 'create';
 
   projectName?: string;
+
+  noPrompt?: boolean;
 }
