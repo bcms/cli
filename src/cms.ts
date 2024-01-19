@@ -970,10 +970,12 @@ export class CMS {
       {
         title: 'Setup project',
         task: async () => {
-          await ChildProcess.spawn('npm', ['run', 'setup'], {
-            stdio: 'inherit',
+          await ChildProcess.advancedExec('npm run setup', {
             cwd: path.join(process.cwd(), answers.projectName),
-          });
+            onChunk: (type, chunk) => {
+              process[type].write(chunk);
+            },
+          }).awaiter;
         },
       },
     ]).run();
