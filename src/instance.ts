@@ -120,9 +120,9 @@ export class Instance {
               '-d',
               'bridge',
               '--subnet',
-              '10.20.30.0/16',
+              '10.20.0.0/16',
               '--ip-range',
-              '10.20.30.128/24',
+              '10.20.30.0/24',
               '--gateway',
               '10.20.30.1',
               'bcms',
@@ -188,8 +188,8 @@ export class Instance {
               host: dbContainerName,
               port: '27017',
             };
-            if (!(await Docker.image.exists('mongo:5-focal'))) {
-              await Docker.image.pull('mongo:5-focal');
+            if (!(await Docker.image.exists('mongo:7'))) {
+              await Docker.image.pull('mongo:7');
             }
             await instanceFs.copy(
               'mongodb',
@@ -211,7 +211,7 @@ export class Instance {
                   `MONGO_INITDB_ROOT_PASSWORD=${dbInfo.pass}`,
                 ],
                 '-v': `${instanceFsBase}/mongodb:/data/db`,
-                'mongo:5-focal': [],
+                'mongo:7': [],
               },
             });
             const cronFile = `/var/spool/cron/crontabs/root`;
@@ -622,8 +622,8 @@ export class Instance {
               dbInfo.name = 'admin';
               dbInfo.host = dbContainerName;
               dbInfo.port = '27017';
-              if (!(await Docker.image.exists('mongo:5-focal'))) {
-                await Docker.image.pull('mongo:5-focal');
+              if (!(await Docker.image.exists('mongo:7'))) {
+                await Docker.image.pull('mongo:7');
               }
               await instanceFs.copy(
                 'mongodb',
@@ -645,7 +645,7 @@ export class Instance {
                     `MONGO_INITDB_ROOT_PASSWORD=${dbInfo.pass}`,
                   ],
                   '-v': `${instanceFsBase}/mongodb:/data/db`,
-                  'mongo:5-focal': [],
+                  'mongo:7': [],
                 },
               });
               const cronFile = `/var/spool/cron/crontabs/root`;
